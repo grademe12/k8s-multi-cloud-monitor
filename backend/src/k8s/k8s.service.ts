@@ -550,8 +550,8 @@ private formatTime(timestamp: Date): string {
   }
 
   private calculateTrend(current: number, previous: number): number {
-    if (previous === 0) return 0;
-    const trend = ((current - previous) / previous) * 100;
+    // 퍼센트 값의 단순 차이로 계산
+    const trend = current - previous;
     return Math.round(trend * 10) / 10;
   }
 
