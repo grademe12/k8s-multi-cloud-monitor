@@ -24,17 +24,19 @@ export default function Dashboard() {
       try {
         setIsLoading(true)
         
-        // ✅ 백엔드 API 호출로 변경
+        // ✅ 백엔드 API 호출
         const response = await fetch(
           `${API_URL}/k8s/stats?provider=${selectedProvider}&stats=${selectedStats.join(",")}&timeRange=${timeRange}`,
         )
         
-        if (!response.ok) throw new Error("Failed to fetch")
+        if (!response.ok) throw new Error(`API Error: ${response.status}`)
         const result = await response.json()
+        
+        console.log('✅ Backend data received:', result)
         setData(result)
         setError(null)
       } catch (err) {
-        console.error('API Error:', err)
+        console.error('❌ API Error:', err)
         setError(err as Error)
       } finally {
         setIsLoading(false)
@@ -42,7 +44,7 @@ export default function Dashboard() {
     }
 
     fetchData()
-    const interval = setInterval(fetchData, 30000)
+    const interval = setInterval(fetchData, 30000) // 30초마다 갱신
     return () => clearInterval(interval)
   }, [selectedProvider, selectedStats, timeRange])
 
@@ -94,7 +96,10 @@ export default function Dashboard() {
         {error && (
           <Card className="border-destructive">
             <CardContent className="pt-6">
-              <p className="text-destructive">Failed to load statistics. Please try again.</p>
+              <p className="text-destructive">Failed to load statistics: {error.message}</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Make sure backend is running on {API_URL}
+              </p>
             </CardContent>
           </Card>
         )}
@@ -104,7 +109,7 @@ export default function Dashboard() {
           <div className="space-y-6">
             {/* Overview Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {selectedStats.includes("cpu") && (
+              {selectedStats.includes("cpu") && data.metrics.cpu && (
                 <MetricCard
                   title="CPU Usage"
                   value={data.metrics.cpu.current}
@@ -113,7 +118,7 @@ export default function Dashboard() {
                   status={data.metrics.cpu.status}
                 />
               )}
-              {selectedStats.includes("memory") && (
+              {selectedStats.includes("memory") && data.metrics.memory && (
                 <MetricCard
                   title="Memory Usage"
                   value={data.metrics.memory.current}
@@ -122,7 +127,7 @@ export default function Dashboard() {
                   status={data.metrics.memory.status}
                 />
               )}
-              {selectedStats.includes("pods") && (
+              {selectedStats.includes("pods") && data.metrics.pods && (
                 <MetricCard
                   title="Running Pods"
                   value={data.metrics.pods.current}
@@ -131,7 +136,7 @@ export default function Dashboard() {
                   status={data.metrics.pods.status}
                 />
               )}
-              {selectedStats.includes("nodes") && (
+              {selectedStats.includes("nodes") && data.metrics.nodes && (
                 <MetricCard
                   title="Active Nodes"
                   value={data.metrics.nodes.current}
@@ -140,7 +145,7 @@ export default function Dashboard() {
                   status={data.metrics.nodes.status}
                 />
               )}
-              {selectedStats.includes("requests") && (
+              {selectedStats.includes("requests") && data.metrics.requests && (
                 <MetricCard
                   title="API Requests"
                   value={data.metrics.requests.current}
@@ -149,7 +154,7 @@ export default function Dashboard() {
                   status={data.metrics.requests.status}
                 />
               )}
-              {selectedStats.includes("errors") && (
+              {selectedStats.includes("errors") && data.metrics.errors && (
                 <MetricCard
                   title="Error Rate"
                   value={data.metrics.errors.current}
@@ -162,22 +167,22 @@ export default function Dashboard() {
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {selectedStats.includes("cpu") && (
+              {selectedStats.includes("cpu") && data.charts.cpu && (
                 <ChartCard title="CPU Usage Over Time" data={data.charts.cpu} timeRange={timeRange} />
               )}
-              {selectedStats.includes("memory") && (
+              {selectedStats.includes("memory") && data.charts.memory && (
                 <ChartCard title="Memory Usage Over Time" data={data.charts.memory} timeRange={timeRange} />
               )}
-              {selectedStats.includes("network") && (
+              {selectedStats.includes("network") && data.charts.network && (
                 <ChartCard title="Network Traffic" data={data.charts.network} timeRange={timeRange} />
               )}
-              {selectedStats.includes("storage") && (
+              {selectedStats.includes("storage") && data.charts.storage && (
                 <ChartCard title="Storage Usage" data={data.charts.storage} timeRange={timeRange} />
               )}
-              {selectedStats.includes("requests") && (
+              {selectedStats.includes("requests") && data.charts.requests && (
                 <ChartCard title="API Requests Over Time" data={data.charts.requests} timeRange={timeRange} />
               )}
-              {selectedStats.includes("errors") && (
+              {selectedStats.includes("errors") && data.charts.errors && (
                 <ChartCard title="Error Rate Over Time" data={data.charts.errors} timeRange={timeRange} />
               )}
             </div>
@@ -196,7 +201,11 @@ export default function Dashboard() {
                     >
                       <div className="flex items-center gap-4">
                         <div
-                          className={`w-2 h-2 rounded-full ${cluster.status === "healthy" ? "bg-chart-2" : "bg-destructive"}`}
+                          className={`w-2 h-2 rounded-full ${
+                            cluster.status === "healthy"
+                              ? "bg-chart-2"
+                              : "bg-destructive"
+                          }`}
                         />
                         <div>
                           <p className="font-medium text-foreground">{cluster.name}</p>
