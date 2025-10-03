@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { K8sService } from './k8s/k8s.service';
 import { K8sController } from './k8s/k8s.controller';
 import { Metric } from './k8s/entities/metric.entity';
+import { K8sModule } from './k8s/k8s.module';
 
 @Module({
   imports: [
@@ -20,8 +21,7 @@ import { Metric } from './k8s/entities/metric.entity';
       synchronize: true,
     }),
     ScheduleModule.forRoot(),
+    K8sModule,  // 추가
   ],
-  controllers: [AppController, K8sController],
-  providers: [AppService, K8sService],
 })
 export class AppModule {}
