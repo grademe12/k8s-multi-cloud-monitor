@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as k8s from '@kubernetes/client-node';
+import { Cron, CronExpression } from '@nestjs/schedule'
 import { MetricsCollectorService } from './metrics-collector.service';
 import {
   K8sStatsResponseDto,
@@ -560,6 +561,39 @@ private formatTime(timestamp: Date): string {
     return 'healthy';
   }
 
+  /**
+ * 매 1분마다 메트릭 수집 및 저장
+ */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async collectAndSaveMetrics() {
+    console.log('🔍 Collecting metrics...');
 
+    try {
+      const [nodes, pods] = await Promise.all([
+        this.getNodes(),
+        this.getAllPods(),
+      ]);
+
+      // CPU 메트릭
+      const cpuMetric = await this.getCpuMetrics(nodes);
+      await this.metricsCollector.saveMetric('raspberry-k3s', 'cpu', cpuMetric.current);
+
+      // Memory 메트릭
+      const memoryMetric = await this.getMemoryMetrics(nodes);
+      await this.metricsCollector.saveMetric('raspberry-k3s', 'memory', memoryMetric.current);
+
+      // Pods 메트릭
+      const runningPods = pods.filter((p) => p.status?.phase === 'Running').length;
+      await this.metricsCollector.saveMetric('raspberry-k3s', 'pods', runningPods);
+
+      // Nodes 메트릭
+      const readyNodes = nodes.filter((n) => n.status === 'True').length;
+      await this.metricsCollector.saveMetric('raspberry-k3s', 'nodes', readyNodes);
+
+      console.log('✅ Metrics saved successfully');
+    } catch (error) {
+      console.error('❌ Failed to collect metrics:', error);
+    }
+  }
 
 }
