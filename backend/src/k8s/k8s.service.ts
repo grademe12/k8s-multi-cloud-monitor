@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as k8s from '@kubernetes/client-node';
+import { MetricsCollectorService } from './metrics-collector.service';
 import {
   K8sStatsResponseDto,
   MetricDto,
@@ -12,7 +13,10 @@ import {
 export class K8sService {
   private kubeConfig: k8s.KubeConfig;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private metricsCollector: MetricsCollectorService,
+  ) {
     this.initializeCluster();
   }
 
@@ -114,7 +118,7 @@ async getPods(namespace?: string) {
     );
 
     // Charts 데이터 생성
-    const charts = await this.generateCharts(requestedStats, timeRange);
+    const charts = await this.generateCharts(requestedStats, timeRange, metrics);
 
     // Clusters 정보
     const clusters = await this.getClustersInfo(provider);
@@ -327,38 +331,93 @@ private async getCpuMetrics(nodes: any[]): Promise<MetricDto> {
   }
 
   /**
-   * Charts 데이터 생성
-   */
-  private async generateCharts(requestedStats: string[], timeRange: string) {
-    const dataPoints = this.getDataPointsCount(timeRange);
-    const charts: any = {};
+ * Charts 데이터 생성 - DB에서 실제 데이터 조회
+ */
+private async generateCharts(
+  requestedStats: string[],
+  timeRange: string,
+  metrics: any,
+) {
+  const charts: any = {};
 
-    if (requestedStats.includes('cpu')) {
-      charts.cpu = this.generateTimeSeries(65, 20, dataPoints);
-    }
-
-    if (requestedStats.includes('memory')) {
-      charts.memory = this.generateTimeSeries(70, 15, dataPoints);
-    }
-
-    if (requestedStats.includes('network')) {
-      charts.network = this.generateTimeSeries(500, 200, dataPoints);
-    }
-
-    if (requestedStats.includes('storage')) {
-      charts.storage = this.generateTimeSeries(80, 10, dataPoints);
-    }
-
-    if (requestedStats.includes('requests')) {
-      charts.requests = this.generateTimeSeries(15000, 5000, dataPoints);
-    }
-
-    if (requestedStats.includes('errors')) {
-      charts.errors = this.generateTimeSeries(0.8, 0.5, dataPoints);
-    }
-
-    return charts;
+  // CPU 차트
+  if (requestedStats.includes('cpu')) {
+    const cpuData = await this.metricsCollector.getMetrics(
+      'raspberry-k3s',
+      'cpu',
+      timeRange,
+    );
+    charts.cpu = this.formatChartData(cpuData);
   }
+
+  // Memory 차트
+  if (requestedStats.includes('memory')) {
+    const memoryData = await this.metricsCollector.getMetrics(
+      'raspberry-k3s',
+      'memory',
+      timeRange,
+    );
+    charts.memory = this.formatChartData(memoryData);
+  }
+
+  // Pods 차트
+  if (requestedStats.includes('pods')) {
+    const podsData = await this.metricsCollector.getMetrics(
+      'raspberry-k3s',
+      'pods',
+      timeRange,
+    );
+    charts.pods = this.formatChartData(podsData);
+  }
+
+  // Nodes 차트
+  if (requestedStats.includes('nodes')) {
+    const nodesData = await this.metricsCollector.getMetrics(
+      'raspberry-k3s',
+      'nodes',
+      timeRange,
+    );
+    charts.nodes = this.formatChartData(nodesData);
+  }
+
+  // 데이터가 없으면 현재 값으로 폴백
+  if (requestedStats.includes('cpu') && (!charts.cpu || charts.cpu.length === 0)) {
+    charts.cpu = [{ time: 'now', value: metrics.cpu?.current || 0 }];
+  }
+
+  if (requestedStats.includes('memory') && (!charts.memory || charts.memory.length === 0)) {
+    charts.memory = [{ time: 'now', value: metrics.memory?.current || 0 }];
+  }
+
+  return charts;
+}
+
+/**
+ * DB 데이터를 차트 형식으로 변환
+ */
+private formatChartData(
+  data: Array<{ timestamp: Date; value: number }>,
+): Array<{ time: string; value: number }> {
+  return data.map((d) => ({
+    time: this.formatTime(d.timestamp),
+    value: d.value,
+  }));
+}
+
+/**
+ * 시간 포맷 (상대 시간)
+ */
+private formatTime(timestamp: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - timestamp.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+
+  if (diffHours > 0) {
+    return `${diffHours}h ago`;
+  }
+  return `${diffMins}m ago`;
+}
 
   /**
    * Clusters 정보 조회
