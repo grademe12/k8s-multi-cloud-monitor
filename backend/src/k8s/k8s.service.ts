@@ -133,7 +133,7 @@ async getPods(namespace?: string) {
   /**
    * 모든 네임스페이스의 Pod 조회
    */
-  private async getAllPods() {
+  public async getAllPods() {
     try {
       const k8sApi = this.kubeConfig.makeApiClient(k8s.CoreV1Api);
       const response = await k8sApi.listPodForAllNamespaces();
@@ -228,7 +228,7 @@ async getPods(namespace?: string) {
   /**
    * CPU Metrics 수집 (K8s Metrics Server 필요)
    */
-private async getCpuMetrics(nodes: any[]): Promise<MetricDto> {
+    public async getCpuMetrics(nodes: any[]): Promise<MetricDto> {
     try {
       // Metrics API 사용
       const metricsClient = new k8s.Metrics(this.kubeConfig);
@@ -281,7 +281,7 @@ private async getCpuMetrics(nodes: any[]): Promise<MetricDto> {
   /**
    * Memory Metrics 수집
    */
-  private async getMemoryMetrics(nodes: any[]): Promise<MetricDto> {
+  public async getMemoryMetrics(nodes: any[]): Promise<MetricDto> {
     try {
       const metricsClient = new k8s.Metrics(this.kubeConfig);
       const nodeMetrics = await metricsClient.getNodeMetrics();

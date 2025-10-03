@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { K8sService } from './k8s.service';
 import { Metric } from './entities/metric.entity';
 
 @Injectable()
@@ -10,48 +8,12 @@ export class MetricsCollectorService {
   constructor(
     @InjectRepository(Metric)
     private metricsRepository: Repository<Metric>,
-    private k8sService: K8sService,
   ) {}
 
   /**
-   * 매 1분마다 메트릭 수집 및 저장
+   * 메트릭 저장 (K8sService에서 호출됨)
    */
-  @Cron(CronExpression.EVERY_MINUTE)
-  async collectMetrics() {
-    console.log('🔍 Collecting metrics...');
-
-    try {
-      const [nodes, pods] = await Promise.all([
-        this.k8sService.getNodes(),
-        this.k8sService.getAllPods(),
-      ]);
-
-      // CPU 메트릭
-      const cpuMetric = await this.k8sService.getCpuMetrics(nodes);
-      await this.saveMetric('raspberry-k3s', 'cpu', cpuMetric.current);
-
-      // Memory 메트릭
-      const memoryMetric = await this.k8sService.getMemoryMetrics(nodes);
-      await this.saveMetric('raspberry-k3s', 'memory', memoryMetric.current);
-
-      // Pods 메트릭
-      const runningPods = pods.filter((p) => p.status === 'Running').length;
-      await this.saveMetric('raspberry-k3s', 'pods', runningPods);
-
-      // Nodes 메트릭
-      const readyNodes = nodes.filter((n) => n.status === 'True').length;
-      await this.saveMetric('raspberry-k3s', 'nodes', readyNodes);
-
-      console.log('✅ Metrics saved successfully');
-    } catch (error) {
-      console.error('❌ Failed to collect metrics:', error);
-    }
-  }
-
-  /**
-   * 메트릭 저장
-   */
-  private async saveMetric(
+  async saveMetric(
     clusterId: string,
     metricType: string,
     value: number,
