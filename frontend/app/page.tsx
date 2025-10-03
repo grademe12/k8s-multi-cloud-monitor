@@ -8,6 +8,9 @@ import { StatSelector } from "@/components/stat-selector"
 import { MetricCard } from "@/components/metric-card"
 import { ChartCard } from "@/components/chart-card"
 
+// 백엔드 API URL
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
 export default function Dashboard() {
   const [selectedProvider, setSelectedProvider] = useState("all")
   const [selectedStats, setSelectedStats] = useState<string[]>(["cpu", "memory", "pods", "nodes"])
@@ -20,14 +23,18 @@ export default function Dashboard() {
     const fetchData = async () => {
       try {
         setIsLoading(true)
+        
+        // ✅ 백엔드 API 호출로 변경
         const response = await fetch(
-          `/api/k8s-stats?provider=${selectedProvider}&stats=${selectedStats.join(",")}&timeRange=${timeRange}`,
+          `${API_URL}/k8s/stats?provider=${selectedProvider}&stats=${selectedStats.join(",")}&timeRange=${timeRange}`,
         )
+        
         if (!response.ok) throw new Error("Failed to fetch")
         const result = await response.json()
         setData(result)
         setError(null)
       } catch (err) {
+        console.error('API Error:', err)
         setError(err as Error)
       } finally {
         setIsLoading(false)
