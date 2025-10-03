@@ -224,19 +224,39 @@ async getPods(namespace?: string) {
   /**
    * CPU Metrics 수집 (K8s Metrics Server 필요)
    */
-  private async getCpuMetrics(nodes: any[]): Promise<MetricDto> {
+private async getCpuMetrics(nodes: any[]): Promise<MetricDto> {
     try {
-      // Metrics API 사용 (올바른 방법)
+      // Metrics API 사용
       const metricsClient = new k8s.Metrics(this.kubeConfig);
       const nodeMetrics = await metricsClient.getNodeMetrics();
 
-      // CPU 사용량 계산 (단순화)
-      const totalCpu = nodeMetrics.items.reduce((sum, item) => {
-        const cpuUsage = this.parseCpuString(item.usage.cpu);
-        return sum + cpuUsage;
-      }, 0);
+      // 노드별 CPU capacity 가져오기
+      const k8sApi = this.kubeConfig.makeApiClient(k8s.CoreV1Api);
+      const nodesResponse = await k8sApi.listNode();
 
-      const avgCpuPercent = (totalCpu / nodes.length) * 100;
+      let totalUsagePercent = 0;
+
+      for (let i = 0; i < nodeMetrics.items.length; i++) {
+        const metric = nodeMetrics.items[i];
+        const node = nodesResponse.items.find(
+          (n) => n.metadata?.name === metric.metadata.name,
+        );
+
+        if (node && node.status?.capacity?.cpu) {
+          // CPU 사용량 (nanocores)
+          const usageNano = this.parseCpuToNano(metric.usage.cpu);
+          // CPU capacity (cores)
+          const capacityCores = this.parseCpuString(node.status.capacity.cpu);
+          const capacityNano = capacityCores * 1000000000;
+
+          // 퍼센트 계산
+          const usagePercent = (usageNano / capacityNano) * 100;
+          totalUsagePercent += usagePercent;
+        }
+      }
+
+      const avgCpuPercent =
+        totalUsagePercent / nodeMetrics.items.length || 0;
 
       return {
         current: Math.round(avgCpuPercent * 10) / 10,
@@ -262,12 +282,34 @@ async getPods(namespace?: string) {
       const metricsClient = new k8s.Metrics(this.kubeConfig);
       const nodeMetrics = await metricsClient.getNodeMetrics();
 
-      const totalMemory = nodeMetrics.items.reduce((sum, item) => {
-        const memUsage = this.parseMemoryString(item.usage.memory);
-        return sum + memUsage;
-      }, 0);
+      // 노드별 Memory capacity 가져오기
+      const k8sApi = this.kubeConfig.makeApiClient(k8s.CoreV1Api);
+      const nodesResponse = await k8sApi.listNode();
 
-      const avgMemPercent = (totalMemory / (nodes.length * 1024)) * 100;
+      let totalUsagePercent = 0;
+
+      for (let i = 0; i < nodeMetrics.items.length; i++) {
+        const metric = nodeMetrics.items[i];
+        const node = nodesResponse.items.find(
+          (n) => n.metadata?.name === metric.metadata.name,
+        );
+
+        if (node && node.status?.capacity?.memory) {
+          // Memory 사용량 (bytes)
+          const usageBytes = this.parseMemoryToBytes(metric.usage.memory);
+          // Memory capacity (bytes)
+          const capacityBytes = this.parseMemoryToBytes(
+            node.status.capacity.memory,
+          );
+
+          // 퍼센트 계산
+          const usagePercent = (usageBytes / capacityBytes) * 100;
+          totalUsagePercent += usagePercent;
+        }
+      }
+
+      const avgMemPercent =
+        totalUsagePercent / nodeMetrics.items.length || 0;
 
       return {
         current: Math.round(avgMemPercent * 10) / 10,
@@ -354,7 +396,72 @@ async getPods(namespace?: string) {
     return allClusters;
   }
 
-  // ===== 유틸리티 메서드 =====
+ // ===== 유틸리티 메서드 =====
+
+  /**
+   * CPU 문자열을 nanocores로 변환
+   * "250m" -> 250000000
+   * "1" -> 1000000000
+   * "1500n" -> 1500
+   */
+  private parseCpuToNano(cpu: string): number {
+    if (!cpu) return 0;
+
+    if (cpu.endsWith('n')) {
+      const value = parseInt(cpu);
+      return isNaN(value) ? 0 : value;
+    }
+    if (cpu.endsWith('m')) {
+      const value = parseInt(cpu);
+      return isNaN(value) ? 0 : value * 1000000;
+    }
+    const value = parseFloat(cpu);
+    return isNaN(value) ? 0 : value * 1000000000;
+  }
+
+  /**
+   * CPU 문자열을 cores로 변환
+   * "250m" -> 0.25
+   * "2" -> 2.0
+   */
+  private parseCpuString(cpu: string): number {
+    if (!cpu) return 0;
+
+    if (cpu.endsWith('m')) {
+      const value = parseInt(cpu);
+      return isNaN(value) ? 0 : value / 1000;
+    }
+    const value = parseFloat(cpu);
+    return isNaN(value) ? 0 : value;
+  }
+
+  /**
+   * Memory 문자열을 bytes로 변환
+   * "1024Ki" -> 1048576
+   * "1Mi" -> 1048576
+   * "1Gi" -> 1073741824
+   */
+  private parseMemoryToBytes(memory: string): number {
+    if (!memory) return 0;
+
+    const units: Record<string, number> = {
+      Ki: 1024,
+      Mi: 1024 * 1024,
+      Gi: 1024 * 1024 * 1024,
+      Ti: 1024 * 1024 * 1024 * 1024,
+    };
+
+    for (const [unit, multiplier] of Object.entries(units)) {
+      if (memory.endsWith(unit)) {
+        const value = parseInt(memory);
+        return isNaN(value) ? 0 : value * multiplier;
+      }
+    }
+
+    // 단위 없으면 bytes로 간주
+    const value = parseInt(memory);
+    return isNaN(value) ? 0 : value;
+  }
 
   private getDataPointsCount(timeRange: string): number {
     const ranges: Record<string, number> = {
@@ -374,13 +481,14 @@ async getPods(namespace?: string) {
   ): ChartDataPointDto[] {
     return Array.from({ length: count }, (_, i) => ({
       time: `${i}h`,
-      value: base + Math.random() * variance - variance / 2,
+      value: Math.max(0, base + Math.random() * variance - variance / 2),
     }));
   }
 
   private calculateTrend(current: number, previous: number): number {
     if (previous === 0) return 0;
-    return Math.round(((current - previous) / previous) * 1000) / 10;
+    const trend = ((current - previous) / previous) * 100;
+    return Math.round(trend * 10) / 10;
   }
 
   private getStatus(
@@ -393,28 +501,6 @@ async getPods(namespace?: string) {
     return 'healthy';
   }
 
-  private parseCpuString(cpu: string): number {
-    // "250m" -> 0.25, "2" -> 2.0
-    if (cpu.endsWith('m')) {
-      return parseInt(cpu) / 1000;
-    }
-    return parseFloat(cpu);
-  }
 
-  private parseMemoryString(memory: string): number {
-    // "1024Ki" -> 1, "1Mi" -> 1
-    const units: Record<string, number> = {
-      Ki: 1 / 1024,
-      Mi: 1,
-      Gi: 1024,
-    };
 
-    for (const [unit, multiplier] of Object.entries(units)) {
-      if (memory.endsWith(unit)) {
-        return parseInt(memory) * multiplier;
-      }
-    }
-
-    return parseInt(memory);
-  }
 }
