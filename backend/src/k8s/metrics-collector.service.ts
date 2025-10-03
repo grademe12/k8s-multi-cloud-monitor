@@ -66,4 +66,39 @@ export class MetricsCollectorService {
     }
     return 12;
   }
+
+  /**
+ * N분 전 메트릭 조회
+ */
+async getPreviousMetric(
+  clusterId: string,
+  metricType: string,
+  minutesAgo: number,
+): Promise<number | null> {
+  const timestamp = new Date(Date.now() - minutesAgo * 60 * 1000);
+
+  const metric = await this.metricsRepository.findOne({
+    where: {
+      clusterId,
+      metricType,
+    },
+    order: {
+      timestamp: 'DESC',
+    },
+  });
+
+  if (!metric) return null;
+
+  // 가장 가까운 과거 데이터 찾기
+  const metrics = await this.metricsRepository
+    .createQueryBuilder('metric')
+    .where('metric.clusterId = :clusterId', { clusterId })
+    .andWhere('metric.metricType = :metricType', { metricType })
+    .andWhere('metric.timestamp <= :timestamp', { timestamp })
+    .orderBy('metric.timestamp', 'DESC')
+    .limit(1)
+    .getOne();
+
+    return metrics ? Number(metrics.value) : null;
+  }
 }

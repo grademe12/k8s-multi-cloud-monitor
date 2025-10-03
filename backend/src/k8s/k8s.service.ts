@@ -229,107 +229,111 @@ async getPods(namespace?: string) {
   /**
    * CPU Metrics 수집 (K8s Metrics Server 필요)
    */
-    public async getCpuMetrics(nodes: any[]): Promise<MetricDto> {
-    try {
-      // Metrics API 사용
-      const metricsClient = new k8s.Metrics(this.kubeConfig);
-      const nodeMetrics = await metricsClient.getNodeMetrics();
+    private async getCpuMetrics(nodes: any[]): Promise<MetricDto> {
+      try {
+        const metricsClient = new k8s.Metrics(this.kubeConfig);
+        const nodeMetrics = await metricsClient.getNodeMetrics();
 
-      // 노드별 CPU capacity 가져오기
-      const k8sApi = this.kubeConfig.makeApiClient(k8s.CoreV1Api);
-      const nodesResponse = await k8sApi.listNode();
+        const k8sApi = this.kubeConfig.makeApiClient(k8s.CoreV1Api);
+        const nodesResponse = await k8sApi.listNode();
 
-      let totalUsagePercent = 0;
+        let totalUsagePercent = 0;
 
-      for (let i = 0; i < nodeMetrics.items.length; i++) {
-        const metric = nodeMetrics.items[i];
-        const node = nodesResponse.items.find(
-          (n) => n.metadata?.name === metric.metadata.name,
+        for (let i = 0; i < nodeMetrics.items.length; i++) {
+          const metric = nodeMetrics.items[i];
+          const node = nodesResponse.items.find(
+            (n) => n.metadata?.name === metric.metadata.name,
+          );
+
+          if (node && node.status?.capacity?.cpu) {
+            const usageNano = this.parseCpuToNano(metric.usage.cpu);
+            const capacityCores = this.parseCpuString(node.status.capacity.cpu);
+            const capacityNano = capacityCores * 1000000000;
+
+            const usagePercent = (usageNano / capacityNano) * 100;
+            totalUsagePercent += usagePercent;
+          }
+        }
+
+        const avgCpuPercent = totalUsagePercent / nodeMetrics.items.length || 0;
+        const current = Math.round(avgCpuPercent * 10) / 10;
+
+        // 5분 전 데이터 조회
+        const previous = await this.metricsCollector.getPreviousMetric(
+          'raspberry-k3s',
+          'cpu',
+          5,
         );
 
-        if (node && node.status?.capacity?.cpu) {
-          // CPU 사용량 (nanocores)
-          const usageNano = this.parseCpuToNano(metric.usage.cpu);
-          // CPU capacity (cores)
-          const capacityCores = this.parseCpuString(node.status.capacity.cpu);
-          const capacityNano = capacityCores * 1000000000;
-
-          // 퍼센트 계산
-          const usagePercent = (usageNano / capacityNano) * 100;
-          totalUsagePercent += usagePercent;
-        }
+        return {
+          current,
+          trend: this.calculateTrend(current, previous || current),
+          status: this.getStatus(current, 80, 60),
+        };
+      } catch (error) {
+        console.error('Metrics Server not available, using mock data:', error);
+        return {
+          current: 65.4,
+          trend: 2.3,
+          status: 'healthy',
+        };
       }
-
-      const avgCpuPercent =
-        totalUsagePercent / nodeMetrics.items.length || 0;
-
-      return {
-        current: Math.round(avgCpuPercent * 10) / 10,
-        trend: this.calculateTrend(avgCpuPercent, avgCpuPercent - 5),
-        status: this.getStatus(avgCpuPercent, 80, 60),
-      };
-    } catch (error) {
-      console.error('Metrics Server not available, using mock data:', error);
-      // Metrics Server가 없을 경우 Mock 데이터
-      return {
-        current: 65.4,
-        trend: 2.3,
-        status: 'healthy',
-      };
     }
-  }
 
   /**
    * Memory Metrics 수집
    */
-  public async getMemoryMetrics(nodes: any[]): Promise<MetricDto> {
-    try {
-      const metricsClient = new k8s.Metrics(this.kubeConfig);
-      const nodeMetrics = await metricsClient.getNodeMetrics();
+    private async getMemoryMetrics(nodes: any[]): Promise<MetricDto> {
+      try {
+        const metricsClient = new k8s.Metrics(this.kubeConfig);
+        const nodeMetrics = await metricsClient.getNodeMetrics();
 
-      // 노드별 Memory capacity 가져오기
-      const k8sApi = this.kubeConfig.makeApiClient(k8s.CoreV1Api);
-      const nodesResponse = await k8sApi.listNode();
+        const k8sApi = this.kubeConfig.makeApiClient(k8s.CoreV1Api);
+        const nodesResponse = await k8sApi.listNode();
 
-      let totalUsagePercent = 0;
+        let totalUsagePercent = 0;
 
-      for (let i = 0; i < nodeMetrics.items.length; i++) {
-        const metric = nodeMetrics.items[i];
-        const node = nodesResponse.items.find(
-          (n) => n.metadata?.name === metric.metadata.name,
-        );
-
-        if (node && node.status?.capacity?.memory) {
-          // Memory 사용량 (bytes)
-          const usageBytes = this.parseMemoryToBytes(metric.usage.memory);
-          // Memory capacity (bytes)
-          const capacityBytes = this.parseMemoryToBytes(
-            node.status.capacity.memory,
+        for (let i = 0; i < nodeMetrics.items.length; i++) {
+          const metric = nodeMetrics.items[i];
+          const node = nodesResponse.items.find(
+            (n) => n.metadata?.name === metric.metadata.name,
           );
 
-          // 퍼센트 계산
-          const usagePercent = (usageBytes / capacityBytes) * 100;
-          totalUsagePercent += usagePercent;
+          if (node && node.status?.capacity?.memory) {
+            const usageBytes = this.parseMemoryToBytes(metric.usage.memory);
+            const capacityBytes = this.parseMemoryToBytes(
+              node.status.capacity.memory,
+            );
+
+            const usagePercent = (usageBytes / capacityBytes) * 100;
+            totalUsagePercent += usagePercent;
+          }
         }
+
+        const avgMemPercent = totalUsagePercent / nodeMetrics.items.length || 0;
+        const current = Math.round(avgMemPercent * 10) / 10;
+
+        // 5분 전 데이터 조회
+        const previous = await this.metricsCollector.getPreviousMetric(
+          'raspberry-k3s',
+          'memory',
+          5,
+        );
+
+        return {
+          current,
+          trend: this.calculateTrend(current, previous || current),
+          status: this.getStatus(current, 85, 70),
+        };
+      } catch (error) {
+        console.error('Metrics Server not available, using mock data:', error);
+        return {
+          current: 72.8,
+          trend: -1.5,
+          status: 'warning',
+        };
       }
-
-      const avgMemPercent =
-        totalUsagePercent / nodeMetrics.items.length || 0;
-
-      return {
-        current: Math.round(avgMemPercent * 10) / 10,
-        trend: this.calculateTrend(avgMemPercent, avgMemPercent - 3),
-        status: this.getStatus(avgMemPercent, 85, 70),
-      };
-    } catch (error) {
-      console.error('Metrics Server not available, using mock data:', error);
-      return {
-        current: 72.8,
-        trend: -1.5,
-        status: 'warning',
-      };
     }
-  }
 
   /**
  * Charts 데이터 생성 - DB에서 실제 데이터 조회
