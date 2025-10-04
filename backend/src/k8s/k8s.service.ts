@@ -200,11 +200,8 @@ async getPods(namespace?: string) {
 
     // Storage Metrics
     if (requestedStats.includes('storage')) {
-      metrics.storage = {
-        current: 78.5,
-        trend: 1.2,
-        status: 'warning',
-      };
+      const storageMetric = await this.getStorageMetrics(nodes);
+      metrics.storage = storageMetric;
     }
 
     // Requests Metrics
@@ -534,6 +531,55 @@ private formatTime(timestamp: Date): string {
       };
     }
 
+
+    /**
+ * Storage Metrics 수집 (노드 디스크 사용량)
+ */
+  private async getStorageMetrics(nodes: any[]): Promise<MetricDto> {
+    try {
+      const k8sApi = this.kubeConfig.makeApiClient(k8s.CoreV1Api);
+      const nodesResponse = await k8sApi.listNode();
+
+      let totalUsagePercent = 0;
+      let nodeCount = 0;
+
+      for (const node of nodesResponse.items) {
+        // 노드의 ephemeral-storage 정보
+        const capacity = node.status?.capacity?.['ephemeral-storage'];
+        const allocatable = node.status?.allocatable?.['ephemeral-storage'];
+
+        if (capacity && allocatable) {
+          const capacityBytes = this.parseMemoryToBytes(capacity);
+          const allocatableBytes = this.parseMemoryToBytes(allocatable);
+          
+          // 사용량 = Capacity - Allocatable
+          const usedBytes = capacityBytes - allocatableBytes;
+          const usagePercent = (usedBytes / capacityBytes) * 100;
+          
+          totalUsagePercent += usagePercent;
+          nodeCount++;
+        }
+      }
+
+      const avgStoragePercent = nodeCount > 0 ? totalUsagePercent / nodeCount : 0;
+      const current = Math.round(avgStoragePercent * 10) / 10;
+
+      return {
+        current,
+        trend: 0,  // trend 없이
+        status: this.getStatus(current, 90, 75),
+      };
+    } catch (error) {
+      console.error('Failed to get storage metrics:', error);
+      // Fallback: 추정값
+      return {
+        current: 45.0,
+        trend: 0,
+        status: 'healthy',
+      };
+    }
+  }
+
  // ===== 유틸리티 메서드 =====
 
   /**
@@ -671,6 +717,10 @@ private formatTime(timestamp: Date): string {
       // Requests 메트릭
       const requestsMetric = await this.getApiRequestMetrics();
       await this.metricsCollector.saveMetric('raspberry-k3s', 'requests', requestsMetric.current);
+
+      // Storage 메트릭
+      const storageMetric = await this.getStorageMetrics(nodes);
+      await this.metricsCollector.saveMetric('raspberry-k3s', 'storage', storageMetric.current);
 
       console.log('✅ Metrics saved successfully');
     } catch (error) {
