@@ -9,6 +9,8 @@ import {
   ChartDataPointDto,
   ClusterDto,
 } from './dto/k8s-stats.dto';
+import * as https from 'https';
+import axios from 'axios';
 
 @Injectable()
 export class K8sService {
@@ -457,47 +459,49 @@ private formatTime(timestamp: Date): string {
     return allClusters;
   }
 
-      /**
-     * API Requests 메트릭 수집
-     */
-    private async getApiRequestMetrics(): Promise<MetricDto> {
-      try {
-        const host = this.configService.get('RASPBERRY_K8S_HOST');
-        const token = this.configService.get('RASPBERRY_K8S_TOKEN');
-        
-        // K8s API Server /metrics 엔드포인트 호출
-        const response = await fetch(`${host}/metrics`, {
-          headers: { Authorization: `Bearer ${token}` },
-          // @ts-ignore
+    // API Reqauests
+      private async getApiRequestMetrics(): Promise<MetricDto> {
+    try {
+      const host = this.configService.get('RASPBERRY_K8S_HOST');
+      const token = this.configService.get('RASPBERRY_K8S_TOKEN');
+      
+      const response = await axios.get(`${host}/metrics`, {
+        headers: { Authorization: `Bearer ${token}` },
+        httpsAgent: new https.Agent({
           rejectUnauthorized: false,
-        });
+        }),
+      });
 
-        if (!response.ok) {
-          return this.getEstimatedRequests();
-        }
+      const metricsText = response.data;
+      const totalRequests = this.parsePrometheusMetric(metricsText, 'apiserver_request_total');
+      
+      // 1분 전 누적값 조회
+      const previous1min = await this.metricsCollector.getPreviousMetric(
+        'raspberry-k3s',
+        'requests_total',
+        1,
+      );
 
-        const metricsText = await response.text();
-        const totalRequests = this.parsePrometheusMetric(metricsText, 'apiserver_request_total');
-        
-        // 5분 전 데이터와 비교
-        const previous = await this.metricsCollector.getPreviousMetric(
-          'raspberry-k3s',
-          'requests',
-          5,
-        );
+      // 분당 요청률 = (현재 누적 - 1분 전 누적) / 1분
+      const requestRate = previous1min 
+        ? totalRequests - previous1min
+        : 0;
 
-        return {
-          current: totalRequests,
-          trend: this.calculateTrend(totalRequests, previous || totalRequests),
-          status: 'healthy',
-        };
-      } catch (error) {
-        console.error('Failed to get API requests:', error.message);
-        return this.getEstimatedRequests();
-      }
+      // 누적값 저장 (다음 계산용)
+      await this.metricsCollector.saveMetric('raspberry-k3s', 'requests_total', totalRequests);
+
+      return {
+        current: requestRate,  // 분당 요청 수
+        trend: 0,  // 트렌드 제외
+        status: 'healthy',
+      };
+    } catch (error) {
+      console.error('Failed to get API requests:', error.message);
+      return this.getEstimatedRequests();
     }
+  }
 
-    /**
+      /**
      * Prometheus 메트릭 파싱
      */
     private parsePrometheusMetric(metricsText: string, metricName: string): number {
@@ -517,7 +521,7 @@ private formatTime(timestamp: Date): string {
     }
 
     /**
-     * Pod 수 기반 API 요청 추정
+     * Pod 수 기반 API 요청 추정 (fallback)
      */
     private async getEstimatedRequests(): Promise<MetricDto> {
       const pods = await this.getAllPods();
@@ -673,5 +677,7 @@ private formatTime(timestamp: Date): string {
       console.error('❌ Failed to collect metrics:', error);
     }
   }
+
+
 
 }
