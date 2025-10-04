@@ -199,10 +199,10 @@ async getPods(namespace?: string) {
     }
 
     // Storage Metrics
-    if (requestedStats.includes('storage')) {
-      const storageMetric = await this.getStorageMetrics(nodes);
-      metrics.storage = storageMetric;
-    }
+      if (requestedStats.includes('storage')) {
+        const storageMetric = await this.getStorageMetrics(nodes);
+        metrics.storage = storageMetric;
+      }
 
     // Requests Metrics
       if (requestedStats.includes('requests')) {
@@ -533,52 +533,125 @@ private formatTime(timestamp: Date): string {
 
 
     /**
- * Storage Metrics 수집 (노드 디스크 사용량)
- */
-  private async getStorageMetrics(nodes: any[]): Promise<MetricDto> {
-    try {
-      const k8sApi = this.kubeConfig.makeApiClient(k8s.CoreV1Api);
-      const nodesResponse = await k8sApi.listNode();
-
-      let totalUsagePercent = 0;
-      let nodeCount = 0;
-
-      for (const node of nodesResponse.items) {
-        // 노드의 ephemeral-storage 정보
-        const capacity = node.status?.capacity?.['ephemeral-storage'];
-        const allocatable = node.status?.allocatable?.['ephemeral-storage'];
-
-        if (capacity && allocatable) {
-          const capacityBytes = this.parseMemoryToBytes(capacity);
-          const allocatableBytes = this.parseMemoryToBytes(allocatable);
+    * Storage Metrics 수집 (노드 디스크 사용량)
+    */
+    private async getStorageMetrics(nodes: any[]): Promise<MetricDto> {
+      try {
+        console.log('🔍 Getting storage metrics for', nodes.length, 'nodes');
+        
+        const k8sApi = this.kubeConfig.makeApiClient(k8s.CoreV1Api);
+        const exec = new k8s.Exec(this.kubeConfig);
+        
+        const systemPods = await k8sApi.listNamespacedPod({
+          namespace: 'kube-system',
+        });
+        
+        console.log('📦 Found', systemPods.items.length, 'system pods');
+        
+        let totalPercent = 0;
+        let nodeCount = 0;
+        
+        for (const node of nodes) {
+          const nodeName = node.name;
+          console.log('🔍 Checking node:', nodeName);
           
-          // 사용량 = Capacity - Allocatable
-          const usedBytes = capacityBytes - allocatableBytes;
-          const usagePercent = (usedBytes / capacityBytes) * 100;
+          if (!nodeName) continue;
           
-          totalUsagePercent += usagePercent;
-          nodeCount++;
+          const nodePods = systemPods.items.filter(
+            p => p.spec?.nodeName === nodeName && p.status?.phase === 'Running'
+          );
+          
+          console.log(`📦 Found ${nodePods.length} pods for node:`, nodeName);
+          
+          let success = false;
+          
+          for (const nodePod of nodePods) {
+            if (!nodePod.metadata?.name || !nodePod.spec?.containers?.[0]?.name) {
+              continue;
+            }
+            
+            try {
+              console.log('🚀 Trying pod:', nodePod.metadata.name);
+              
+              const command = ['df', '-h', '/'];
+              let output = '';
+              
+              const stdout = new (require('stream').Writable)({
+                write(chunk: any, encoding: string, callback: Function) {
+                  output += chunk.toString();
+                  callback();
+                }
+              });
+
+              const stderr = new (require('stream').Writable)({
+                write(chunk: any, encoding: string, callback: Function) {
+                  callback();
+                }
+              });
+              
+              await new Promise<void>((resolve, reject) => {
+                exec.exec(
+                  'kube-system',
+                  nodePod.metadata!.name!,
+                  nodePod.spec!.containers[0].name!,
+                  command,
+                  stdout,
+                  stderr,
+                  null,
+                  false,
+                  (status: k8s.V1Status) => {
+                    if (status.status === 'Success') {
+                      // 출력이 완전히 들어올 때까지 잠깐 대기
+                      setTimeout(() => resolve(), 500);  // ← 추가
+                    } else {
+                      reject(new Error(status.message || 'Exec failed'));
+                    }
+                  }
+                ).then(() => {}).catch(reject);
+              });
+              
+              console.log('📊 Raw output:', output);
+              
+              const match = output.match(/(\d+)%/);
+              if (match) {
+                const percent = parseInt(match[1]);
+                console.log('✅ Success! Parsed percent:', percent);
+                totalPercent += percent;
+                nodeCount++;
+                success = true;
+                break;
+              }
+            } catch (error) {
+              console.log('❌ Failed with pod:', nodePod.metadata.name, error.message);
+              continue;
+            }
+          }
+          
+          if (!success) {
+            console.log('⚠️ No working pod found for node:', nodeName);
+          }
         }
+        
+        const avgPercent = nodeCount > 0 ? Math.round(totalPercent / nodeCount) : 0;
+        
+        console.log('✅ Final result - Total:', totalPercent, 'Count:', nodeCount, 'Avg:', avgPercent);
+        
+        return {
+          current: avgPercent,
+          trend: 0,
+          status: this.getStatus(avgPercent, 90, 75),
+        };
+      } catch (error) {
+        console.error('❌ Failed to get storage metrics:', error);
+        return {
+          current: 0,
+          trend: 0,
+          status: 'healthy',
+        };
       }
-
-      const avgStoragePercent = nodeCount > 0 ? totalUsagePercent / nodeCount : 0;
-      const current = Math.round(avgStoragePercent * 10) / 10;
-
-      return {
-        current,
-        trend: 0,  // trend 없이
-        status: this.getStatus(current, 90, 75),
-      };
-    } catch (error) {
-      console.error('Failed to get storage metrics:', error);
-      // Fallback: 추정값
-      return {
-        current: 45.0,
-        trend: 0,
-        status: 'healthy',
-      };
     }
-  }
+
+  
 
  // ===== 유틸리티 메서드 =====
 

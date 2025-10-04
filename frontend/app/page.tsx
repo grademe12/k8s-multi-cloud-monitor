@@ -163,6 +163,16 @@ export default function Dashboard() {
                   status={data.metrics.errors.status}
                 />
               )}
+              {/* 🆕 Storage 추가 */}
+              {selectedStats.includes("storage") && data.metrics.storage && (
+                <MetricCard
+                  title="Storage Usage"
+                  value={data.metrics.storage.current}
+                  unit="%"
+                  trend={data.metrics.storage.trend}
+                  status={data.metrics.storage.status}
+                />
+              )}
             </div>
 
             {/* Charts */}
