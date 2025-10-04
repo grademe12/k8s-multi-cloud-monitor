@@ -205,14 +205,11 @@ async getPods(namespace?: string) {
       };
     }
 
-    // Requests Metrics (Mock)
-    if (requestedStats.includes('requests')) {
-      metrics.requests = {
-        current: 15234,
-        trend: 3.2,
-        status: 'healthy',
-      };
-    }
+    // Requests Metrics
+      if (requestedStats.includes('requests')) {
+        const requestsMetric = await this.getApiRequestMetrics();
+        metrics.requests = requestsMetric;
+      }
 
     // Errors Metrics (Mock)
     if (requestedStats.includes('errors')) {
@@ -460,6 +457,79 @@ private formatTime(timestamp: Date): string {
     return allClusters;
   }
 
+      /**
+     * API Requests 메트릭 수집
+     */
+    private async getApiRequestMetrics(): Promise<MetricDto> {
+      try {
+        const host = this.configService.get('RASPBERRY_K8S_HOST');
+        const token = this.configService.get('RASPBERRY_K8S_TOKEN');
+        
+        // K8s API Server /metrics 엔드포인트 호출
+        const response = await fetch(`${host}/metrics`, {
+          headers: { Authorization: `Bearer ${token}` },
+          // @ts-ignore
+          rejectUnauthorized: false,
+        });
+
+        if (!response.ok) {
+          return this.getEstimatedRequests();
+        }
+
+        const metricsText = await response.text();
+        const totalRequests = this.parsePrometheusMetric(metricsText, 'apiserver_request_total');
+        
+        // 5분 전 데이터와 비교
+        const previous = await this.metricsCollector.getPreviousMetric(
+          'raspberry-k3s',
+          'requests',
+          5,
+        );
+
+        return {
+          current: totalRequests,
+          trend: this.calculateTrend(totalRequests, previous || totalRequests),
+          status: 'healthy',
+        };
+      } catch (error) {
+        console.error('Failed to get API requests:', error.message);
+        return this.getEstimatedRequests();
+      }
+    }
+
+    /**
+     * Prometheus 메트릭 파싱
+     */
+    private parsePrometheusMetric(metricsText: string, metricName: string): number {
+      const lines = metricsText.split('\n');
+      let total = 0;
+
+      for (const line of lines) {
+        if (line.startsWith('#') || !line.trim()) continue;
+        
+        if (line.startsWith(metricName)) {
+          const match = line.match(/\s+(\d+)$/);
+          if (match) total += parseInt(match[1]);
+        }
+      }
+
+      return total;
+    }
+
+    /**
+     * Pod 수 기반 API 요청 추정
+     */
+    private async getEstimatedRequests(): Promise<MetricDto> {
+      const pods = await this.getAllPods();
+      const estimated = pods.length * 100; // Pod당 분당 100 요청 추정
+      
+      return {
+        current: estimated,
+        trend: 0,
+        status: 'healthy',
+      };
+    }
+
  // ===== 유틸리티 메서드 =====
 
   /**
@@ -593,6 +663,10 @@ private formatTime(timestamp: Date): string {
       // Nodes 메트릭
       const readyNodes = nodes.filter((n) => n.status === 'True').length;
       await this.metricsCollector.saveMetric('raspberry-k3s', 'nodes', readyNodes);
+
+      // Requests 메트릭
+      const requestsMetric = await this.getApiRequestMetrics();
+      await this.metricsCollector.saveMetric('raspberry-k3s', 'requests', requestsMetric.current);
 
       console.log('✅ Metrics saved successfully');
     } catch (error) {
