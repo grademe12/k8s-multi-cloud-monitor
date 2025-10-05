@@ -211,13 +211,10 @@ async getPods(namespace?: string) {
       }
 
     // Errors Metrics (Mock)
-    if (requestedStats.includes('errors')) {
-      metrics.errors = {
-        current: 0.8,
-        trend: -0.3,
-        status: 'healthy',
-      };
-    }
+      if (requestedStats.includes('errors')) {
+        const errorMetric = await this.getErrorMetrics(pods);
+        metrics.errors = errorMetric;
+      }
 
     return metrics;
   }
@@ -379,6 +376,20 @@ private async generateCharts(
       timeRange,
     );
     charts.nodes = this.formatChartData(nodesData);
+  }
+
+    // Error Rate
+  if (requestedStats.includes('errors')) {
+    const errorData = await this.metricsCollector.getMetrics(
+      'raspberry-k3s',
+      'pod_error_rate',
+      timeRange,
+    );
+    charts.errors = this.formatChartData(errorData);
+    
+    if (!charts.errors || charts.errors.length === 0) {
+      charts.errors = [{ time: 'now', value: metrics.errors?.current || 0 }];
+    }
   }
 
   // 데이터가 없으면 현재 값으로 폴백
@@ -651,7 +662,109 @@ private formatTime(timestamp: Date): string {
       }
     }
 
-  
+          /**
+     * Error Rate 메트릭 수집
+     */
+      private async getErrorMetrics(pods: any[]): Promise<MetricDto> {
+        const totalPods = pods.length;
+        
+        // Pod가 없으면 에러율 0
+        if (totalPods === 0) {
+          return {
+            current: 0,
+            trend: 0,
+            status: 'healthy',
+          };
+        }
+
+        // 문제 있는 Pod 찾기
+        const problemPods = pods.filter(pod => {
+          const phase = pod.status?.phase;
+          const containerStatuses = pod.status?.containerStatuses || [];
+          
+          // 1. Pod 자체가 실패 상태
+          if (['Failed', 'Error', 'Unknown', 'Pending'].includes(phase)) {
+            // Pending이 5분 이상이면 문제로 간주
+            if (phase === 'Pending') {
+              const startTime = new Date(pod.status?.startTime || pod.metadata?.creationTimestamp);
+              const now = new Date();
+              const pendingMinutes = (now.getTime() - startTime.getTime()) / 1000 / 60;
+              return pendingMinutes > 5;  // 5분 이상 Pending
+            }
+            return true;
+          }
+          
+          // 2. Container 레벨 문제 체크
+          const hasContainerError = containerStatuses.some((cs: any) => {
+            // Waiting 상태의 문제들
+            const waitingReason = cs.state?.waiting?.reason;
+            if (waitingReason) {
+              return [
+                'CrashLoopBackOff',
+                'ImagePullBackOff', 
+                'ErrImagePull',
+                'CreateContainerConfigError',
+                'InvalidImageName',
+                'CreateContainerError'
+              ].includes(waitingReason);
+            }
+            
+            // Terminated 상태의 문제들
+            const terminatedReason = cs.state?.terminated?.reason;
+            if (terminatedReason) {
+              return [
+                'Error',
+                'OOMKilled',
+                'DeadlineExceeded',
+                'Evicted'
+              ].includes(terminatedReason);
+            }
+            
+            // 재시작 횟수가 많으면 문제
+            return cs.restartCount > 5;
+          });
+          
+          return hasContainerError;
+        });
+
+        // 에러율 계산
+        const errorRate = (problemPods.length / totalPods) * 100;
+        const current = Math.round(errorRate * 100) / 100;  // 소수점 2자리
+        
+        // 5분 전 데이터와 비교 (트렌드)
+        const previous = await this.metricsCollector.getPreviousMetric(
+          'raspberry-k3s',
+          'pod_error_rate',
+          5,
+        );
+        
+        // 디버깅용 로그
+        console.log(`📊 Pod Error Metrics:`, {
+          totalPods,
+          problemPods: problemPods.length,
+          errorRate: current,
+          problems: problemPods.map(p => ({
+            name: p.metadata?.name,
+            phase: p.status?.phase,
+            reason: p.status?.containerStatuses?.[0]?.state?.waiting?.reason
+          }))
+        });
+
+        return {
+          current,
+          trend: previous !== null ? this.calculateTrend(current, previous) : 0,
+          status: this.getErrorStatus(current),
+        };
+      }
+
+      /**
+       * 에러율에 따른 상태 결정
+       */
+      private getErrorStatus(errorRate: number): 'healthy' | 'warning' | 'critical' {
+        if (errorRate >= 10) return 'critical';  // 10% 이상
+        if (errorRate >= 5) return 'warning';    // 5% 이상  
+        return 'healthy';                        // 5% 미만
+      }
 
  // ===== 유틸리티 메서드 =====
 
@@ -794,6 +907,11 @@ private formatTime(timestamp: Date): string {
       // Storage 메트릭
       const storageMetric = await this.getStorageMetrics(nodes);
       await this.metricsCollector.saveMetric('raspberry-k3s', 'storage', storageMetric.current);
+
+      // Error Rate 메트릭
+      const errorMetric = await this.getErrorMetrics(pods);
+      await this.metricsCollector.saveMetric('raspberry-k3s', 'pod_error_rate', errorMetric.current);
+
 
       console.log('✅ Metrics saved successfully');
     } catch (error) {
