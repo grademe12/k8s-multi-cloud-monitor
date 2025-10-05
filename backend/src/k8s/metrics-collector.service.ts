@@ -29,30 +29,39 @@ export class MetricsCollectorService {
   /**
    * 특정 기간의 메트릭 조회
    */
-  async getMetrics(
-    clusterId: string,
-    metricType: string,
-    timeRange: string,
-  ): Promise<Array<{ timestamp: Date; value: number }>> {
-    const hours = this.parseTimeRange(timeRange);
-    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    async getMetrics(
+      clusterId: string,
+      metricType: string,
+      timeRange: string,
+    ): Promise<Array<{ timestamp: Date; value: number }>> {
+      const hours = this.parseTimeRange(timeRange);
+      const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    const metrics = await this.metricsRepository.find({
-      where: {
-        clusterId,
-        metricType,
-        timestamp: MoreThanOrEqual(since),
-      },
-      order: {
-        timestamp: 'ASC',
-      },
-    });
+      const metrics = await this.metricsRepository.find({
+        where: {
+          clusterId,
+          metricType,
+          timestamp: MoreThanOrEqual(since),
+        },
+        order: {
+          timestamp: 'ASC',
+        },
+      });
 
-    return metrics.map((m) => ({
-      timestamp: m.timestamp,
-      value: Number(m.value),
-    }));
-  }
+      // 🔧 이상값 필터링 및 보간
+      return metrics
+        .map((m) => ({
+          timestamp: m.timestamp,
+          value: Number(m.value),
+        }))
+        .filter((m) => {
+          // CPU/Memory는 0-100 범위만
+          if (metricType === 'cpu' || metricType === 'memory') {
+            return m.value >= 0 && m.value <= 100;
+          }
+          return true;
+        });
+    }
 
   /**
    * 시간 범위 파싱

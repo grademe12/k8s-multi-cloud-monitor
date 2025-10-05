@@ -886,11 +886,21 @@ private formatTime(timestamp: Date): string {
 
       // CPU 메트릭
       const cpuMetric = await this.getCpuMetrics(nodes);
-      await this.metricsCollector.saveMetric('raspberry-k3s', 'cpu', cpuMetric.current);
+      const cpuValue = cpuMetric.current;
+      if (cpuValue >= 0 && cpuValue <= 100) {
+        await this.metricsCollector.saveMetric('raspberry-k3s', 'cpu', cpuValue);
+      } else {
+        console.warn(`⚠️ Abnormal CPU value detected: ${cpuValue}, skipping save`);
+      }
 
       // Memory 메트릭
       const memoryMetric = await this.getMemoryMetrics(nodes);
-      await this.metricsCollector.saveMetric('raspberry-k3s', 'memory', memoryMetric.current);
+      const memoryValue = memoryMetric.current;
+      if (memoryValue >= 0 && memoryValue <= 100) {
+        await this.metricsCollector.saveMetric('raspberry-k3s', 'memory', memoryValue);
+      } else {
+        console.warn(`⚠️ Abnormal Memory value detected: ${memoryValue}, skipping save`);
+      }
 
       // Pods 메트릭
       const runningPods = pods.filter((p) => p.status?.phase === 'Running').length;
