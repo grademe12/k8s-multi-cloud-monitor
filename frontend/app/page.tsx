@@ -3,12 +3,14 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
 import { CloudProviderSelector } from "@/components/cloud-provider-selector"
 import { StatSelector } from "@/components/stat-selector"
 import { MetricCard } from "@/components/metric-card"
 import { ChartCard } from "@/components/chart-card"
+import { EmptyState } from "@/components/empty-state"
+import { AddClusterDialog, type ClusterConfig } from "@/components/add-cluster-dialog"
 
-// 백엔드 API URL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 export default function Dashboard() {
@@ -18,25 +20,42 @@ export default function Dashboard() {
   const [data, setData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const [clusters, setClusters] = useState<ClusterConfig[]>([])
+  const [isAddClusterOpen, setIsAddClusterOpen] = useState(false)
 
   useEffect(() => {
+    const savedClusters = localStorage.getItem("k8s-clusters")
+    if (savedClusters) {
+      setClusters(JSON.parse(savedClusters))
+    }
+    setIsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    if (clusters.length > 0) {
+      localStorage.setItem("k8s-clusters", JSON.stringify(clusters))
+    }
+  }, [clusters])
+
+  useEffect(() => {
+    if (clusters.length === 0) {
+      setIsLoading(false)
+      return
+    }
+
     const fetchData = async () => {
       try {
         setIsLoading(true)
-        
-        // ✅ 백엔드 API 호출
+        // Mock API 대신 실제 백엔드 호출
         const response = await fetch(
           `${API_URL}/k8s/stats?provider=${selectedProvider}&stats=${selectedStats.join(",")}&timeRange=${timeRange}`,
         )
-        
         if (!response.ok) throw new Error(`API Error: ${response.status}`)
         const result = await response.json()
-        
-        console.log('✅ Backend data received:', result)
         setData(result)
         setError(null)
       } catch (err) {
-        console.error('❌ API Error:', err)
+        console.error('API Error:', err)
         setError(err as Error)
       } finally {
         setIsLoading(false)
@@ -44,9 +63,34 @@ export default function Dashboard() {
     }
 
     fetchData()
-    const interval = setInterval(fetchData, 30000) // 30초마다 갱신
+    const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
-  }, [selectedProvider, selectedStats, timeRange])
+  }, [selectedProvider, selectedStats, timeRange, clusters])
+
+  const handleAddCluster = (cluster: ClusterConfig) => {
+    setClusters([...clusters, cluster])
+  }
+
+  if (clusters.length === 0 && !isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border bg-card">
+          <div className="container mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold text-foreground">Multi-Cloud K8s Dashboard</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Monitor your Kubernetes clusters across cloud providers
+                </p>
+              </div>
+            </div>
+          </div>
+        </header>
+        <EmptyState onAddCluster={() => setIsAddClusterOpen(true)} />
+        <AddClusterDialog open={isAddClusterOpen} onOpenChange={setIsAddClusterOpen} onAddCluster={handleAddCluster} />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -81,7 +125,18 @@ export default function Dashboard() {
       <div className="container mx-auto px-6 py-6">
         {/* Controls */}
         <div className="flex flex-col lg:flex-row gap-4 mb-6">
-          <CloudProviderSelector selected={selectedProvider} onSelect={setSelectedProvider} />
+          <div className="flex items-center gap-2">
+            <CloudProviderSelector selected={selectedProvider} onSelect={setSelectedProvider} />
+            <Button
+              onClick={() => setIsAddClusterOpen(true)}
+              size="icon"
+              variant="outline"
+              className="h-10 w-10 shrink-0"
+              title="Add new cluster"
+            >
+              <span className="text-lg">+</span>
+            </Button>
+          </div>
           <StatSelector selected={selectedStats} onSelect={setSelectedStats} />
         </div>
 
@@ -96,10 +151,7 @@ export default function Dashboard() {
         {error && (
           <Card className="border-destructive">
             <CardContent className="pt-6">
-              <p className="text-destructive">Failed to load statistics: {error.message}</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Make sure backend is running on {API_URL}
-              </p>
+              <p className="text-destructive">Failed to load statistics. Please try again.</p>
             </CardContent>
           </Card>
         )}
@@ -109,7 +161,7 @@ export default function Dashboard() {
           <div className="space-y-6">
             {/* Overview Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {selectedStats.includes("cpu") && data.metrics.cpu && (
+              {selectedStats.includes("cpu") && (
                 <MetricCard
                   title="CPU Usage"
                   value={data.metrics.cpu.current}
@@ -118,7 +170,7 @@ export default function Dashboard() {
                   status={data.metrics.cpu.status}
                 />
               )}
-              {selectedStats.includes("memory") && data.metrics.memory && (
+              {selectedStats.includes("memory") && (
                 <MetricCard
                   title="Memory Usage"
                   value={data.metrics.memory.current}
@@ -127,7 +179,7 @@ export default function Dashboard() {
                   status={data.metrics.memory.status}
                 />
               )}
-              {selectedStats.includes("pods") && data.metrics.pods && (
+              {selectedStats.includes("pods") && (
                 <MetricCard
                   title="Running Pods"
                   value={data.metrics.pods.current}
@@ -136,7 +188,7 @@ export default function Dashboard() {
                   status={data.metrics.pods.status}
                 />
               )}
-              {selectedStats.includes("nodes") && data.metrics.nodes && (
+              {selectedStats.includes("nodes") && (
                 <MetricCard
                   title="Active Nodes"
                   value={data.metrics.nodes.current}
@@ -154,16 +206,16 @@ export default function Dashboard() {
                   status={data.metrics.requests.status}
                 />
               )}
+
               {selectedStats.includes("errors") && data.metrics.errors && (
                 <MetricCard
-                  title="Error Rate"
+                  title="Pod Error Rate"
                   value={data.metrics.errors.current}
                   unit="%"
                   trend={data.metrics.errors.trend}
                   status={data.metrics.errors.status}
                 />
               )}
-              {/* 🆕 Storage 추가 */}
               {selectedStats.includes("storage") && data.metrics.storage && (
                 <MetricCard
                   title="Storage Usage"
@@ -177,22 +229,22 @@ export default function Dashboard() {
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {selectedStats.includes("cpu") && data.charts.cpu && (
+              {selectedStats.includes("cpu") && (
                 <ChartCard title="CPU Usage Over Time" data={data.charts.cpu} timeRange={timeRange} />
               )}
-              {selectedStats.includes("memory") && data.charts.memory && (
+              {selectedStats.includes("memory") && (
                 <ChartCard title="Memory Usage Over Time" data={data.charts.memory} timeRange={timeRange} />
               )}
-              {selectedStats.includes("network") && data.charts.network && (
+              {selectedStats.includes("network") && (
                 <ChartCard title="Network Traffic" data={data.charts.network} timeRange={timeRange} />
               )}
-              {selectedStats.includes("storage") && data.charts.storage && (
+              {selectedStats.includes("storage") && (
                 <ChartCard title="Storage Usage" data={data.charts.storage} timeRange={timeRange} />
               )}
-              {selectedStats.includes("requests") && data.charts.requests && (
+              {selectedStats.includes("requests") && (
                 <ChartCard title="API Requests Over Time" data={data.charts.requests} timeRange={timeRange} />
               )}
-              {selectedStats.includes("errors") && data.charts.errors && (
+              {selectedStats.includes("errors") && (
                 <ChartCard title="Error Rate Over Time" data={data.charts.errors} timeRange={timeRange} />
               )}
             </div>
@@ -204,19 +256,13 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {data.clusters.map((cluster: any) => (
+                  {clusters.map((cluster) => (
                     <div
                       key={cluster.id}
                       className="flex items-center justify-between p-4 rounded-lg bg-secondary/50 border border-border"
                     >
                       <div className="flex items-center gap-4">
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            cluster.status === "healthy"
-                              ? "bg-chart-2"
-                              : "bg-destructive"
-                          }`}
-                        />
+                        <div className="w-2 h-2 rounded-full bg-chart-2" />
                         <div>
                           <p className="font-medium text-foreground">{cluster.name}</p>
                           <p className="text-sm text-muted-foreground">{cluster.provider}</p>
@@ -224,16 +270,16 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center gap-6 text-sm">
                         <div>
-                          <span className="text-muted-foreground">Nodes: </span>
-                          <span className="text-foreground font-mono">{cluster.nodes}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Pods: </span>
-                          <span className="text-foreground font-mono">{cluster.pods}</span>
+                          <span className="text-muted-foreground">Region: </span>
+                          <span className="text-foreground font-mono">{cluster.region}</span>
                         </div>
                         <div>
                           <span className="text-muted-foreground">Version: </span>
                           <span className="text-foreground font-mono">{cluster.version}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Endpoint: </span>
+                          <span className="text-foreground font-mono text-xs">{cluster.apiEndpoint}</span>
                         </div>
                       </div>
                     </div>
@@ -244,6 +290,8 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      <AddClusterDialog open={isAddClusterOpen} onOpenChange={setIsAddClusterOpen} onAddCluster={handleAddCluster} />
     </div>
   )
 }
