@@ -10,6 +10,7 @@ import { MetricCard } from "@/components/metric-card"
 import { ChartCard } from "@/components/chart-card"
 import { EmptyState } from "@/components/empty-state"
 import { AddClusterDialog, type ClusterConfig } from "@/components/add-cluster-dialog"
+import { useRouter } from "next/navigation"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -22,6 +23,23 @@ export default function Dashboard() {
   const [error, setError] = useState<Error | null>(null)
   const [clusters, setClusters] = useState<ClusterConfig[]>([])
   const [isAddClusterOpen, setIsAddClusterOpen] = useState(false)
+
+  // 로그인 관련
+  const router = useRouter()
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
+    setIsAuthenticated(true)
+  }, [])
+    if (!isAuthenticated) {
+    return null
+  }
+  // 로그인 관련
 
   useEffect(() => {
     const savedClusters = localStorage.getItem("k8s-clusters")
