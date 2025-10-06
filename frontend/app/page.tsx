@@ -126,7 +126,10 @@ export default function Dashboard() {
         {/* Controls */}
         <div className="flex flex-col lg:flex-row gap-4 mb-6">
           <div className="flex items-center gap-2">
-            <CloudProviderSelector selected={selectedProvider} onSelect={setSelectedProvider} />
+            <CloudProviderSelector
+              selected={selectedProvider}
+              onSelect={setSelectedProvider}
+              clusters={clusters} />
             <Button
               onClick={() => setIsAddClusterOpen(true)}
               size="icon"

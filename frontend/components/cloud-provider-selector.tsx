@@ -1,37 +1,76 @@
-"use client"
+// frontend/components/cloud-provider-selector.tsx
 
-import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import { Card } from "@/components/ui/card"
+
+interface Cluster {
+  id: string
+  name: string
+  provider: string
+  apiEndpoint: string
+  region: string
+}
 
 interface CloudProviderSelectorProps {
   selected: string
   onSelect: (provider: string) => void
+  clusters: Cluster[]
 }
 
-const providers = [
-  { id: "all", name: "All Providers", icon: "☁" },
-  { id: "naver", name: "Naver Cloud", icon: "🖥" },
-  { id: "aws", name: "AWS EKS", icon: "🖥" },
-  { id: "gcp", name: "GCP GKE", icon: "🖥" },
-  { id: "azure", name: "Azure AKS", icon: "🖥" },
-]
+export function CloudProviderSelector({ 
+  selected, 
+  onSelect, 
+  clusters 
+}: CloudProviderSelectorProps) {
+  
+  const getProviderIcon = (provider: string) => {
+    switch(provider) {
+      case 'kpaas': return '🇰🇷'
+      case 'aws': return '☁️'
+      case 'gcp': return '🔷'
+      case 'azure': return '⚠️'
+      case 'naver': return '🟢'
+      default: return '📦'
+    }
+  }
 
-export function CloudProviderSelector({ selected, onSelect }: CloudProviderSelectorProps) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {providers.map((provider) => {
-        return (
-          <Button
-            key={provider.id}
-            variant={selected === provider.id ? "default" : "outline"}
-            size="sm"
-            onClick={() => onSelect(provider.id)}
-            className="gap-2"
-          >
-            <span className="text-base">{provider.icon}</span>
-            {provider.name}
-          </Button>
-        )
-      })}
+    <div className="flex gap-2 flex-wrap">
+      {/* All Clusters */}
+      <Card
+        className={cn(
+          "px-4 py-2 cursor-pointer transition-all",
+          selected === "all" && "ring-2 ring-primary"
+        )}
+        onClick={() => onSelect("all")}
+      >
+        <div className="flex items-center gap-2">
+          <span>🌍</span>
+          <span className="font-medium">All Clusters</span>
+          {clusters.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              ({clusters.length})
+            </span>
+          )}
+        </div>
+      </Card>
+
+      {/* 각 클러스터 */}
+      {clusters.map((cluster) => (
+        <Card
+          key={cluster.id}
+          className={cn(
+            "px-4 py-2 cursor-pointer transition-all",
+            selected === cluster.id && "ring-2 ring-primary"
+          )}
+          onClick={() => onSelect(cluster.id)}
+        >
+          <div className="flex items-center gap-2">
+            <span>{getProviderIcon(cluster.provider)}</span>
+            <span className="font-medium">{cluster.name}</span>
+          </div>
+        </Card>
+      ))}
     </div>
   )
 }
