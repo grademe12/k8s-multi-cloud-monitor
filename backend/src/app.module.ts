@@ -11,6 +11,7 @@ import { K8sModule } from './k8s/k8s.module';
 import { AuthModule } from './auth/auth.module';
 import { User } from './auth/entities/user.entity';
 import { Cluster } from './clusters/entities/cluster.entity';
+import { ClustersModule } from './clusters/clusters.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { Cluster } from './clusters/entities/cluster.entity';
     ScheduleModule.forRoot(),
     K8sModule,  // 추가
     AuthModule,
+    ClustersModule,
   ],
 })
 export class AppModule {}
