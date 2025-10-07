@@ -8,6 +8,9 @@ import { K8sService } from './k8s/k8s.service';
 import { K8sController } from './k8s/k8s.controller';
 import { Metric } from './k8s/entities/metric.entity';
 import { K8sModule } from './k8s/k8s.module';
+import { AuthModule } from './auth/auth.module';
+import { User } from './auth/entities/user.entity';
+import { Cluster } from './clusters/entities/cluster.entity';
 
 @Module({
   imports: [
@@ -17,11 +20,12 @@ import { K8sModule } from './k8s/k8s.module';
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: process.env.DB_PATH || './metrics.db',
-      entities: [Metric],
+      entities: [Metric, User, Cluster],
       synchronize: true,
     }),
     ScheduleModule.forRoot(),
     K8sModule,  // 추가
+    AuthModule,
   ],
 })
 export class AppModule {}
