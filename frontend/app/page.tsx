@@ -22,7 +22,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [clusters, setClusters] = useState<ClusterConfig[]>([])
-  const [isAddClusterOpen, setIsAddClusterOpen] = useState(false)
+  const [isAddClusterOpen, setIsAddClusterOpen] = useState<boolean | null>(null)
 
   // 로그인 관련
   const router = useRouter()
@@ -32,13 +32,11 @@ export default function Dashboard() {
     const token = localStorage.getItem('token')
     if (!token) {
       router.push('/login')
-      return
+      setIsAuthenticated(false)
+    } else {
+      setIsAuthenticated(true)
     }
-    setIsAuthenticated(true)
-  }, [])
-    if (!isAuthenticated) {
-    return null
-  }
+  }, [router])
   // 로그인 관련
 
   useEffect(() => {
@@ -56,7 +54,8 @@ export default function Dashboard() {
   }, [clusters])
 
   useEffect(() => {
-    if (clusters.length === 0) {
+    // isAuthenticated가 false면 실행 안 함
+    if (!isAuthenticated || clusters.length === 0) {
       setIsLoading(false)
       return
     }
@@ -87,6 +86,14 @@ export default function Dashboard() {
 
   const handleAddCluster = (cluster: ClusterConfig) => {
     setClusters([...clusters, cluster])
+  }
+
+    if (isAuthenticated === null) {
+    return <div>Loading...</div>
+  }
+
+  if (isAuthenticated === false) {
+    return <div>Redirecting to login...</div>
   }
 
   if (clusters.length === 0 && !isLoading) {
