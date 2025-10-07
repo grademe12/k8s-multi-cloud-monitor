@@ -11,6 +11,7 @@ import { ChartCard } from "@/components/chart-card"
 import { EmptyState } from "@/components/empty-state"
 import { AddClusterDialog, type ClusterConfig } from "@/components/add-cluster-dialog"
 import { useRouter } from "next/navigation"
+import { Trash2 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -87,7 +88,35 @@ export default function Dashboard() {
   const handleAddCluster = (cluster: ClusterConfig) => {
     setClusters([...clusters, cluster])
   }
+// 클러스터 삭제 함수
+  const handleDeleteCluster = async (clusterId: string) => {
+  if (!confirm('정말로 이 클러스터를 삭제하시겠습니까?')) {
+    return;
+  }
 
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/clusters/${clusterId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (response.ok) {
+      // 로컬 상태 업데이트
+      const updatedClusters = clusters.filter(c => c.id !== clusterId);
+      setClusters(updatedClusters);
+      localStorage.setItem('k8s-clusters', JSON.stringify(updatedClusters));
+    } else {
+      alert('클러스터 삭제에 실패했습니다.');
+    }
+  } catch (error) {
+    console.error('Delete error:', error);
+    alert('클러스터 삭제 중 오류가 발생했습니다.');
+  }
+};
+// 클러스터 삭제 함수 end
     if (isAuthenticated === null) {
     return <div>Loading...</div>
   }
@@ -309,6 +338,14 @@ export default function Dashboard() {
                           <span className="text-muted-foreground">Endpoint: </span>
                           <span className="text-foreground font-mono text-xs">{cluster.apiEndpoint}</span>
                         </div>
+                                    <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => handleDeleteCluster(cluster.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
                       </div>
                     </div>
                   ))}
