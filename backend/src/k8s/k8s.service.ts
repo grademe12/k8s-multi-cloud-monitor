@@ -435,6 +435,34 @@ private async generateCharts(
     charts.nodes = this.formatChartData(nodesData);
   }
 
+    // ✅ Storage 차트 추가
+  if (requestedStats.includes('storage')) {
+    const storageData = await this.metricsCollector.getMetrics(
+      'raspberry-k3s',
+      'storage',
+      timeRange,
+    );
+    charts.storage = this.formatChartData(storageData);
+    
+    if (!charts.storage || charts.storage.length === 0) {
+      charts.storage = [{ time: 'now', value: metrics.storage?.current || 0 }];
+    }
+  }
+
+  // ✅ Requests 차트 추가
+  if (requestedStats.includes('requests')) {
+    const requestsData = await this.metricsCollector.getMetrics(
+      'raspberry-k3s',
+      'requests',
+      timeRange,
+    );
+    charts.requests = this.formatChartData(requestsData);
+    
+    if (!charts.requests || charts.requests.length === 0) {
+      charts.requests = [{ time: 'now', value: metrics.requests?.current || 0 }];
+    }
+  }
+
     // Error Rate
   if (requestedStats.includes('errors')) {
     const errorData = await this.metricsCollector.getMetrics(
