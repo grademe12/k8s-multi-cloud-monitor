@@ -40,19 +40,19 @@ export default function Dashboard() {
   }, [router])
   // 로그인 관련
 
-  useEffect(() => {
-    const savedClusters = localStorage.getItem("k8s-clusters")
-    if (savedClusters) {
-      setClusters(JSON.parse(savedClusters))
-    }
-    setIsLoading(false)
-  }, [])
+  // useEffect(() => {
+  //   const savedClusters = localStorage.getItem("k8s-clusters")
+  //   if (savedClusters) {
+  //     setClusters(JSON.parse(savedClusters))
+  //   }
+  //   setIsLoading(false)
+  // }, [])
 
-  useEffect(() => {
-    if (clusters.length > 0) {
-      localStorage.setItem("k8s-clusters", JSON.stringify(clusters))
-    }
-  }, [clusters])
+  // useEffect(() => {
+  //   if (clusters.length > 0) {
+  //     localStorage.setItem("k8s-clusters", JSON.stringify(clusters))
+  //   }
+  // }, [clusters]) 클러스터 db 등록하면서 제거함
 
   useEffect(() => {
     // isAuthenticated가 false면 실행 안 함
@@ -60,6 +60,42 @@ export default function Dashboard() {
       setIsLoading(false)
       return
     }
+
+  useEffect(() => {
+  if (!isAuthenticated) return;
+  
+  const fetchClusters = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/clusters`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const fetchedClusters = await response.json();
+        setClusters(fetchedClusters);
+      } else if (response.status === 401) {
+        // 인증 실패 - 로그인 페이지로
+        router.push('/login');
+      }
+    } catch (error) {
+      console.error('클러스터 목록 조회 실패:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  fetchClusters();
+}, [isAuthenticated, router]);
+
 
     const fetchData = async () => {
       try {
@@ -83,13 +119,13 @@ export default function Dashboard() {
     fetchData()
     const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
-  }, [selectedProvider, selectedStats, timeRange, clusters])
+  }, [selectedProvider, selectedStats, timeRange, clusters, isAuthenticated])
 
-  const handleAddCluster = (cluster: ClusterConfig) => {
-    setClusters([...clusters, cluster])
-  }
+  // const handleAddCluster = (cluster: ClusterConfig) => {
+  //   setClusters([...clusters, cluster])
+  // }
 // 클러스터 삭제 함수
-  const handleDeleteCluster = async (clusterId: string) => {
+const handleDeleteCluster = async (clusterId: string) => {
   if (!confirm('정말로 이 클러스터를 삭제하시겠습니까?')) {
     return;
   }
@@ -104,10 +140,10 @@ export default function Dashboard() {
     });
 
     if (response.ok) {
-      // 로컬 상태 업데이트
+      // DB에서 삭제 성공 - 상태 업데이트
       const updatedClusters = clusters.filter(c => c.id !== clusterId);
       setClusters(updatedClusters);
-      localStorage.setItem('k8s-clusters', JSON.stringify(updatedClusters));
+      alert('클러스터가 삭제되었습니다.');
     } else {
       alert('클러스터 삭제에 실패했습니다.');
     }
@@ -117,6 +153,49 @@ export default function Dashboard() {
   }
 };
 // 클러스터 삭제 함수 end
+
+// 클러스터 등록 api 콜 함수
+const handleAddCluster = async (cluster: ClusterConfig) => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      alert('로그인이 필요합니다.');
+      router.push('/login');
+      return;
+    }
+
+    const response = await fetch(`${API_URL}/clusters`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name: cluster.name,
+        provider: cluster.provider,
+        apiEndpoint: cluster.apiEndpoint,
+        region: cluster.region,
+        version: cluster.version,
+        token: cluster.token,
+      }),
+    });
+
+    if (response.ok) {
+      const newCluster = await response.json();
+      // 상태 업데이트
+      setClusters([...clusters, newCluster]);
+      alert('클러스터가 성공적으로 등록되었습니다!');
+    } else {
+      const error = await response.json();
+      alert(`클러스터 등록 실패: ${error.message || '알 수 없는 오류'}`);
+    }
+  } catch (error) {
+    console.error('클러스터 등록 오류:', error);
+    alert('클러스터 등록 중 오류가 발생했습니다.');
+  }
+};
+// 클러스터 등록 api 콜 함수 END
     if (isAuthenticated === null) {
     return <div>Loading...</div>
   }
