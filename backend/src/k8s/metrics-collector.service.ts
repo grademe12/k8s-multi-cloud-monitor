@@ -10,6 +10,21 @@ export class MetricsCollectorService {
     private metricsRepository: Repository<Metric>,
   ) {}
 
+
+//DB기반 수정 START
+async getLatestMetric(
+  clusterId: string,
+  metricType: string,
+): Promise<number | null> {
+  const result = await this.metricsRepository.findOne({
+    where: { clusterId, metricType },
+    order: { timestamp: 'DESC' },
+  });
+  
+  return result ? Number(result.value) : null;
+}
+//DB기반 수정 END
+
   /**
    * 메트릭 저장 (K8sService에서 호출됨)
    */
@@ -96,9 +111,12 @@ async getPreviousMetric(
     },
   });
 
+
   // minutesAgo 이전 데이터 중 가장 최근 것 찾기
   const previousMetric = metrics.find(m => m.timestamp <= targetTime);
   
   return previousMetric ? Number(previousMetric.value) : null;
 }
+
+
 }

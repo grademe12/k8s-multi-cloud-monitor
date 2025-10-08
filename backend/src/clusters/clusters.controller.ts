@@ -1,6 +1,7 @@
-mport { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { ClustersService } from './clusters.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Cluster } from './entities/cluster.entity';
 
 @Controller('clusters')
 @UseGuards(JwtAuthGuard)

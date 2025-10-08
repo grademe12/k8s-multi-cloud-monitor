@@ -107,17 +107,17 @@ async getPods(namespace?: string) {
   ): Promise<K8sStatsResponseDto> {
     const requestedStats = statsParam.split(',');
 
-    // 실제 클러스터 데이터 수집
-    const [nodes, allPods] = await Promise.all([
-      this.getNodes(),
-      this.getAllPods(),
-    ]);
+    // 실제 클러스터 데이터 수집. db기반 수정후 사용 안함
+    // const [nodes, allPods] = await Promise.all([
+    //   this.getNodes(),
+    //   this.getAllPods(),
+    // ]);
 
     // Metrics 계산
     const metrics = await this.calculateMetrics(
       requestedStats,
-      nodes,
-      allPods,
+      //nodes, db기반 수정후 사용 안함
+      //allPods, db기반 수정후 사용 안함
     );
 
     // Charts 데이터 생성
@@ -152,42 +152,42 @@ async getPods(namespace?: string) {
    */
   private async calculateMetrics(
     requestedStats: string[],
-    nodes: any[],
-    pods: any[],
+    //nodes: any[], db기반으로 변경후 사용 안함
+    //pods: any[], db기반으로 변경후 사용 안함
   ) {
     const metrics: any = {};
 
-    // CPU Metrics
-    if (requestedStats.includes('cpu')) {
-      const cpuMetrics = await this.getCpuMetrics(nodes);
-      metrics.cpu = cpuMetrics;
-    }
+    // // CPU Metrics
+    // if (requestedStats.includes('cpu')) {
+    //   const cpuMetrics = await this.getCpuMetrics(nodes);
+    //   metrics.cpu = cpuMetrics;
+    // }
 
-    // Memory Metrics
-    if (requestedStats.includes('memory')) {
-      const memoryMetrics = await this.getMemoryMetrics(nodes);
-      metrics.memory = memoryMetrics;
-    }
+    // // Memory Metrics
+    // if (requestedStats.includes('memory')) {
+    //   const memoryMetrics = await this.getMemoryMetrics(nodes);
+    //   metrics.memory = memoryMetrics;
+    // }
 
-    // Pods Metrics
-    if (requestedStats.includes('pods')) {
-      const runningPods = pods.filter((p) => p.status?.phase === 'Running');
-      metrics.pods = {
-        current: runningPods.length,
-        trend: this.calculateTrend(runningPods.length, runningPods.length - 5),
-        status: this.getStatus(runningPods.length, 200, 150),
-      };
-    }
+    // // Pods Metrics
+    // if (requestedStats.includes('pods')) {
+    //   const runningPods = pods.filter((p) => p.status?.phase === 'Running');
+    //   metrics.pods = {
+    //     current: runningPods.length,
+    //     trend: this.calculateTrend(runningPods.length, runningPods.length - 5),
+    //     status: this.getStatus(runningPods.length, 200, 150),
+    //   };
+    // }
 
-    // Nodes Metrics
-    if (requestedStats.includes('nodes')) {
-      const readyNodes = nodes.filter((n) => n.status === 'True');
-      metrics.nodes = {
-        current: readyNodes.length,
-        trend: 0,
-        status: readyNodes.length === nodes.length ? 'healthy' : 'warning',
-      };
-    }
+    // // Nodes Metrics
+    // if (requestedStats.includes('nodes')) {
+    //   const readyNodes = nodes.filter((n) => n.status === 'True');
+    //   metrics.nodes = {
+    //     current: readyNodes.length,
+    //     trend: 0,
+    //     status: readyNodes.length === nodes.length ? 'healthy' : 'warning',
+    //   };
+    // }
 
     // Network Metrics (Mock - K8s에서 직접 수집 어려움)
     if (requestedStats.includes('network')) {
@@ -198,26 +198,84 @@ async getPods(namespace?: string) {
       };
     }
 
-    // Storage Metrics
-      if (requestedStats.includes('storage')) {
-        const storageMetric = await this.getStorageMetrics(nodes);
-        metrics.storage = storageMetric;
-      }
+    // // Storage Metrics
+    //   if (requestedStats.includes('storage')) {
+    //     const storageMetric = await this.getStorageMetrics(nodes);
+    //     metrics.storage = storageMetric;
+    //   }
 
-    // Requests Metrics
-      if (requestedStats.includes('requests')) {
-        const requestsMetric = await this.getApiRequestMetrics();
-        metrics.requests = requestsMetric;
-      }
+    // // Requests Metrics
+    //   if (requestedStats.includes('requests')) {
+    //     const requestsMetric = await this.getApiRequestMetrics();
+    //     metrics.requests = requestsMetric;
+    //   }
 
-    // Errors Metrics (Mock)
-      if (requestedStats.includes('errors')) {
-        const errorMetric = await this.getErrorMetrics(pods);
-        metrics.errors = errorMetric;
-      }
+    // // Errors Metrics (Mock)
+    //   if (requestedStats.includes('errors')) {
+    //     const errorMetric = await this.getErrorMetrics(pods);
+    //     metrics.errors = errorMetric;
+    //   }
+    // DB기반으로 변경 후 사용 안함.
+
+      for (const stat of requestedStats) {
+    const metricType = this.getMetricTypeMapping(stat);
+    
+    // DB에서 최신 값 조회
+    const latest = await this.metricsCollector.getLatestMetric(
+      'raspberry-k3s',
+      metricType,
+    );
+    
+    // DB에서 5분 전 값 조회
+    const previous = await this.metricsCollector.getPreviousMetric(
+      'raspberry-k3s',
+      metricType,
+      5,
+    );
+
+    const current = latest || 0;
+    const trend = this.calculateTrend(current, previous || current);
+    
+    metrics[stat] = {
+      current,
+      trend,
+      status: this.getMetricStatus(stat, current),
+    };
+  }
 
     return metrics;
   }
+
+    private getMetricTypeMapping(stat: string): string {
+  const mapping: Record<string, string> = {
+    'cpu': 'cpu',
+    'memory': 'memory',
+    'pods': 'pods',
+    'nodes': 'nodes',
+    'storage': 'storage',
+    'requests': 'requests',
+    'errors': 'pod_error_rate',
+    'network': 'network',
+  };
+  return mapping[stat] || stat;
+}
+
+private getMetricStatus(stat: string, value: number): 'healthy' | 'warning' | 'critical' {
+  const thresholds: Record<string, { warning: number; critical: number }> = {
+    'cpu': { warning: 60, critical: 80 },
+    'memory': { warning: 70, critical: 85 },
+    'storage': { warning: 75, critical: 90 },
+    'errors': { warning: 5, critical: 10 },
+  };
+
+  const threshold = thresholds[stat];
+  if (!threshold) return 'healthy';
+
+  if (value >= threshold.critical) return 'critical';
+  if (value >= threshold.warning) return 'warning';
+  return 'healthy';
+}
+//DB 기반 변환 END
 
   /**
    * CPU Metrics 수집 (K8s Metrics Server 필요)
@@ -272,7 +330,6 @@ async getPods(namespace?: string) {
         };
       }
     }
-
   /**
    * Memory Metrics 수집
    */
@@ -876,7 +933,7 @@ private formatTime(timestamp: Date): string {
  */
   @Cron(CronExpression.EVERY_MINUTE)
   async collectAndSaveMetrics() {
-    console.log('🔍 Collecting metrics...');
+    console.log('\n🔍 Collecting metrics...[START]\n');
 
     try {
       const [nodes, pods] = await Promise.all([
@@ -887,11 +944,20 @@ private formatTime(timestamp: Date): string {
       // CPU 메트릭
       const cpuMetric = await this.getCpuMetrics(nodes);
       const cpuValue = cpuMetric.current;
-      if (cpuValue >= 0 && cpuValue <= 100) {
-        await this.metricsCollector.saveMetric('raspberry-k3s', 'cpu', cpuValue);
-      } else {
-        console.warn(`⚠️ Abnormal CPU value detected: ${cpuValue}, skipping save`);
+      // debug code start
+          console.log('📊 CPU Debug:', {
+      current: cpuValue,
+      trend: cpuMetric.trend,
+      willSave: cpuValue >= 0 && cpuValue <= 100
+    });
+    
+    if (cpuValue >= 0 && cpuValue <= 100) {
+      await this.metricsCollector.saveMetric('raspberry-k3s', 'cpu', cpuValue);
+      console.log('✅ CPU saved:', cpuValue);
+    } else {
+              console.warn(`⚠️ Abnormal CPU value detected: ${cpuValue}, skipping save`);
       }
+    //debug code end
 
       // Memory 메트릭
       const memoryMetric = await this.getMemoryMetrics(nodes);
@@ -923,9 +989,10 @@ private formatTime(timestamp: Date): string {
       await this.metricsCollector.saveMetric('raspberry-k3s', 'pod_error_rate', errorMetric.current);
 
 
-      console.log('✅ Metrics saved successfully');
+      console.log('\n✅ Metrics saved successfully [END]\n');
     } catch (error) {
       console.error('❌ Failed to collect metrics:', error);
+      console.error('Error stack:', error.stack);
     }
   }
 
