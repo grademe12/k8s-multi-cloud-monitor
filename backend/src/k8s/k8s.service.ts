@@ -198,9 +198,63 @@ export class K8sService {
   /**
    * 클러스터 통계 수집
    */
+// async getClusterStats(
+//   userId: string,  // ← 사용자 ID 추가
+//   provider: string,
+//   statsParam: string,
+//   timeRange: string,
+// ): Promise<K8sStatsResponseDto> {
+//   const requestedStats = statsParam.split(',');
+
+//   // 사용자의 클러스터 조회
+//   let clusters = await this.clusterRepository.find({
+//     where: { userId },
+//     select: ['id', 'name', 'provider', 'apiEndpoint', 'region', 'version']
+//   });
+
+//   // Provider 필터링
+//   if (provider && provider !== 'all') {
+//     clusters = clusters.filter(c => 
+//       c.provider.toLowerCase().includes(provider.toLowerCase())
+//     );
+//   }
+
+//   // 각 클러스터의 메트릭 DB에서 조회
+//   const metrics = await this.calculateMetrics(requestedStats, clusters[0]?.id);
+
+//   // 차트 데이터
+//   const charts = await this.generateCharts(requestedStats, timeRange, clusters[0]?.id, metrics);
+
+//   // 클러스터 정보
+//   const clustersInfo = await Promise.all(
+//     clusters.map(async (cluster) => {
+//       const [nodes, pods] = await Promise.all([
+//         this.getNodes(cluster.id),
+//         this.getPods(cluster.id),
+//       ]);
+
+//       return {
+//         id: cluster.id,
+//         name: cluster.name,
+//         provider: cluster.provider,
+//         status: 'healthy' as const,
+//         nodes: nodes.length,
+//         pods: pods.length,
+//         version: cluster.version || 'unknown',
+//       };
+//     })
+//   );
+
+//   return {
+//     metrics,
+//     charts,
+//     clusters: clustersInfo,
+//   };
+// }
+
 async getClusterStats(
-  userId: string,  // ← 사용자 ID 추가
-  provider: string,
+  userId: string,
+  clusterId: string,  // 특정 클러스터 ID 또는 'all'
   statsParam: string,
   timeRange: string,
 ): Promise<K8sStatsResponseDto> {
@@ -209,73 +263,184 @@ async getClusterStats(
   // 사용자의 클러스터 조회
   let clusters = await this.clusterRepository.find({
     where: { userId },
-    select: ['id', 'name', 'provider', 'apiEndpoint', 'region', 'version']
+    select: ['id', 'name', 'provider', 'apiEndpoint', 'region', 'version', 'token']
   });
 
-  // Provider 필터링
-  if (provider && provider !== 'all') {
-    clusters = clusters.filter(c => 
-      c.provider.toLowerCase().includes(provider.toLowerCase())
-    );
+  // 클러스터가 없으면 빈 응답 반환
+  if (clusters.length === 0) {
+    return {
+      metrics: {},
+      charts: {},
+      clusters: [],
+    };
   }
 
-  // 각 클러스터의 메트릭 DB에서 조회
-  const metrics = await this.calculateMetrics(requestedStats, clusters[0]?.id);
+  // clusterId가 지정되면 해당 클러스터만 선택, 아니면 전체
+  let selectedCluster: Cluster | null = null;
+  if (clusterId && clusterId !== 'all') {
+    selectedCluster = clusters.find(c => c.id === clusterId) || null;
+    if (!selectedCluster) {
+      throw new Error(`Cluster ${clusterId} not found`);
+    }
+  }
 
-  // 차트 데이터
-  const charts = await this.generateCharts(requestedStats, timeRange, clusters[0]?.id, metrics);
+  // 메트릭과 차트 데이터 수집
+  let aggregatedMetrics: any = {};
+  let aggregatedCharts: any = {};
 
-  // 클러스터 정보
+  if (selectedCluster) {
+    // 특정 클러스터의 메트릭만 조회
+    aggregatedMetrics = await this.calculateMetrics(requestedStats, selectedCluster.id);
+    aggregatedCharts = await this.generateCharts(requestedStats, timeRange, selectedCluster.id, aggregatedMetrics);
+  } else {
+    // 모든 클러스터의 메트릭을 집계
+    const allMetrics = await Promise.all(
+      clusters.map(cluster => this.calculateMetrics(requestedStats, cluster.id))
+    );
+    
+    // 평균값 계산
+    aggregatedMetrics = this.aggregateMetrics(allMetrics, requestedStats);
+    
+    // 모든 클러스터의 차트 데이터를 합쳐서 표시
+    const allCharts = await Promise.all(
+      clusters.map(cluster => 
+        this.generateCharts(requestedStats, timeRange, cluster.id, aggregatedMetrics)
+      )
+    );
+    
+    // 차트 데이터 병합 (시간별로 정렬)
+    aggregatedCharts = this.mergeChartData(allCharts, requestedStats);
+  }
+
+  // 클러스터 정보 수집
   const clustersInfo = await Promise.all(
     clusters.map(async (cluster) => {
-      const [nodes, pods] = await Promise.all([
-        this.getNodes(cluster.id),
-        this.getPods(cluster.id),
-      ]);
+      try {
+        const [nodes, pods] = await Promise.all([
+          this.getNodes(cluster.id),
+          this.getPods(cluster.id),
+        ]);
 
-      return {
-        id: cluster.id,
-        name: cluster.name,
-        provider: cluster.provider,
-        status: 'healthy' as const,
-        nodes: nodes.length,
-        pods: pods.length,
-        version: cluster.version || 'unknown',
-      };
+        // 해당 클러스터의 최신 메트릭 조회
+        const clusterMetrics = await this.calculateMetrics(requestedStats, cluster.id);
+
+        return {
+          id: cluster.id,
+          name: cluster.name,
+          provider: cluster.provider,
+          status: this.determineClusterStatus(clusterMetrics),
+          nodes: nodes.length,
+          pods: pods.length,
+          version: cluster.version || 'unknown',
+        };
+      } catch (error) {
+        console.error(`Failed to get info for cluster ${cluster.name}:`, error.message);
+        return {
+          id: cluster.id,
+          name: cluster.name,
+          provider: cluster.provider,
+          status: 'critical' as const,
+          nodes: 0,
+          pods: 0,
+          version: cluster.version || 'unknown',
+        };
+      }
     })
   );
 
   return {
-    metrics,
-    charts,
+    metrics: aggregatedMetrics,
+    charts: aggregatedCharts,
     clusters: clustersInfo,
   };
+}
 
-    // 실제 클러스터 데이터 수집. db기반 수정후 사용 안함
-    // const [nodes, allPods] = await Promise.all([
-    //   this.getNodes(),
-    //   this.getAllPods(),
-    // ]);
-
-    // Metrics 계산
-    // const metrics = await this.calculateMetrics(
-    //   requestedStats,
-    //   //nodes, db기반 수정후 사용 안함
-    //   //allPods, db기반 수정후 사용 안함
-    // );
-
-    // // Charts 데이터 생성
-    // const charts = await this.generateCharts(requestedStats, timeRange, metrics);
-
-    // // Clusters 정보
-    // const clusters = await this.getClustersInfo(provider);
-
-    // return {
-    //   metrics,
-    //   charts,
-    //   clusters,
-    // };
+/**
+ * 여러 클러스터의 메트릭을 평균값으로 집계
+ */
+private aggregateMetrics(allMetrics: any[], requestedStats: string[]): any {
+  const aggregated: any = {};
+  
+  for (const stat of requestedStats) {
+    const validMetrics = allMetrics
+      .map(m => m[stat])
+      .filter(m => m !== undefined);
+    
+    if (validMetrics.length > 0) {
+      const avgCurrent = validMetrics.reduce((sum, m) => sum + m.current, 0) / validMetrics.length;
+      const avgTrend = validMetrics.reduce((sum, m) => sum + m.trend, 0) / validMetrics.length;
+      
+      aggregated[stat] = {
+        current: Math.round(avgCurrent * 10) / 10,
+        trend: Math.round(avgTrend * 10) / 10,
+        status: this.getMetricStatus(stat, avgCurrent),
+      };
+    }
   }
+  
+  return aggregated;
+}
+
+/**
+ * 여러 클러스터의 차트 데이터를 병합
+ */
+private mergeChartData(allCharts: any[], requestedStats: string[]): any {
+  const merged: any = {};
+  
+  for (const stat of requestedStats) {
+    const allStatCharts = allCharts
+      .map(charts => charts[stat])
+      .filter(chart => chart && chart.length > 0);
+    
+    if (allStatCharts.length > 0) {
+      // 모든 시간대의 데이터를 수집
+      const timeMap = new Map<string, number[]>();
+      
+      for (const chart of allStatCharts) {
+        for (const point of chart) {
+          if (!timeMap.has(point.time)) {
+            timeMap.set(point.time, []);
+          }
+          timeMap.get(point.time)?.push(point.value);
+        }
+      }
+      
+      // 시간대별 평균 계산
+      merged[stat] = Array.from(timeMap.entries())
+        .map(([time, values]) => ({
+          time,
+          value: Math.round(values.reduce((a, b) => a + b, 0) / values.length * 10) / 10
+        }))
+        .sort((a, b) => {
+          // 시간순 정렬 (예: "2h ago" < "1h ago" < "now")
+          const getTimeValue = (time: string) => {
+            if (time === 'now') return 0;
+            const match = time.match(/(\d+)([hmd]) ago/);
+            if (!match) return -1;
+            const [, num, unit] = match;
+            const multiplier = unit === 'm' ? 1 : unit === 'h' ? 60 : 1440;
+            return parseInt(num) * multiplier;
+          };
+          return getTimeValue(b.time) - getTimeValue(a.time);
+        });
+    }
+  }
+  
+  return merged;
+}
+
+/**
+ * 클러스터의 전체 상태 판단
+ */
+private determineClusterStatus(metrics: any): 'healthy' | 'warning' | 'critical' {
+  const statuses = Object.values(metrics)
+    .filter((m: any) => m && m.status)
+    .map((m: any) => m.status);
+  
+  if (statuses.includes('critical')) return 'critical';
+  if (statuses.includes('warning')) return 'warning';
+  return 'healthy';
+}
 
   /**
    * 모든 네임스페이스의 Pod 조회

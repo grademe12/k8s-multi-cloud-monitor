@@ -10,16 +10,21 @@ export class K8sController {
 
   /**
    * 클러스터 통계 조회 API
-   * GET /k8s/stats?provider=all&stats=cpu,memory,pods,nodes&timeRange=12h
+   * GET /k8s/stats?clusterId=all&stats=cpu,memory,pods,nodes&timeRange=12h
    */
   @Get('stats')
   async getStats(
     @Request() req,
-    @Query('provider') provider: string = 'all',
+    @Query('clusterId') clusterId: string = 'all',  // provider 대신 clusterId 사용
     @Query('stats') stats: string = 'cpu,memory,pods,nodes',
     @Query('timeRange') timeRange: string = '12h',
   ): Promise<K8sStatsResponseDto> {
-    return await this.k8sService.getClusterStats(req.user.id, provider, stats, timeRange);
+    return await this.k8sService.getClusterStats(
+      req.user.id, 
+      clusterId,  // clusterId 전달
+      stats, 
+      timeRange
+    );
   }
 
   /**
