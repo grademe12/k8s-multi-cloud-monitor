@@ -1,8 +1,10 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { K8sService } from './k8s.service';
 import { GetStatsQueryDto, K8sStatsResponseDto } from './dto/k8s-stats.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('k8s')
+@UseGuards(JwtAuthGuard)
 export class K8sController {
   constructor(private readonly k8sService: K8sService) {}
 
@@ -12,11 +14,12 @@ export class K8sController {
    */
   @Get('stats')
   async getStats(
+    @Request() req,
     @Query('provider') provider: string = 'all',
     @Query('stats') stats: string = 'cpu,memory,pods,nodes',
     @Query('timeRange') timeRange: string = '12h',
   ): Promise<K8sStatsResponseDto> {
-    return await this.k8sService.getClusterStats(provider, stats, timeRange);
+    return await this.k8sService.getClusterStats(req.user.id, provider, stats, timeRange);
   }
 
   /**
@@ -24,8 +27,11 @@ export class K8sController {
    * GET /k8s/nodes
    */
   @Get('nodes')
-  async getNodes() {
-    return await this.k8sService.getNodes();
+  async getNodes(
+    @Request() req,
+    @Query('clusterId') clusterId: string
+  ) {
+    return await this.k8sService.getNodes(clusterId);
   }
 
   /**
@@ -33,7 +39,11 @@ export class K8sController {
    * GET /k8s/pods?namespace=default
    */
   @Get('pods')
-  async getPods(@Query('namespace') namespace?: string) {
-    return await this.k8sService.getPods(namespace);
+  async getPods(
+    @Request() req,
+    @Query('clusterId') clusterId: string,
+    @Query('namespace') namespace?: string
+  ) {
+    return await this.k8sService.getPods(clusterId, namespace);
   }
 }
