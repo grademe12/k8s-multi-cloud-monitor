@@ -1,119 +1,58 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { MetricCard } from "@/components/metric-card"
-import { ChartCard } from "@/components/chart-card"
-import { ClusterCard } from "@/components/cluster-card"
-import { CloudProviderSelector } from "@/components/cloud-provider-selector"
-import { StatsToggle } from "@/components/stats-toggle"
-import { AddClusterDialog } from "@/components/add-cluster-dialog"
-import { EmptyState } from "@/components/empty-state"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Plus, RefreshCw, LogOut } from "lucide-react"
+import { CloudProviderSelector } from "@/components/cloud-provider-selector"
+import { StatSelector } from "@/components/stat-selector"
+import { MetricCard } from "@/components/metric-card"
+import { ChartCard } from "@/components/chart-card"
+import { EmptyState } from "@/components/empty-state"
+import { AddClusterDialog, type ClusterConfig } from "@/components/add-cluster-dialog"
 import { useRouter } from "next/navigation"
-
-// Types
-interface Cluster {
-  id: string
-  name: string
-  provider: string
-  apiEndpoint: string
-  region: string
-  version?: string
-  status?: 'healthy' | 'warning' | 'critical'
-  nodes?: number
-  pods?: number
-}
-
-interface ClusterConfig {
-  name: string
-  provider: string
-  apiEndpoint: string
-  region: string
-  version: string
-  token: string
-}
-
-interface MetricDto {
-  current: number
-  trend: number
-  status: 'healthy' | 'warning' | 'critical'
-}
-
-interface K8sStatsResponse {
-  metrics: {
-    cpu?: MetricDto
-    memory?: MetricDto
-    pods?: MetricDto
-    nodes?: MetricDto
-    storage?: MetricDto
-    network?: MetricDto
-    requests?: MetricDto
-    errors?: MetricDto
-  }
-  charts: {
-    cpu?: Array<{ time: string; value: number }>
-    memory?: Array<{ time: string; value: number }>
-    pods?: Array<{ time: string; value: number }>
-    nodes?: Array<{ time: string; value: number }>
-    storage?: Array<{ time: string; value: number }>
-    network?: Array<{ time: string; value: number }>
-    requests?: Array<{ time: string; value: number }>
-    errors?: Array<{ time: string; value: number }>
-  }
-  clusters: Array<{
-    id: string
-    name: string
-    provider: string
-    status: 'healthy' | 'warning' | 'critical'
-    nodes: number
-    pods: number
-    version: string
-  }>
-}
+import { Trash2 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
-export default function Home() {
-  // Authentication state
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+export default function Dashboard() {
   const router = useRouter()
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   
   // Data states
-  const [data, setData] = useState<K8sStatsResponse | null>(null)
-  const [clusters, setClusters] = useState<Cluster[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-  
-  // UI states
   const [selectedCluster, setSelectedCluster] = useState("all")
-  const [selectedStats, setSelectedStats] = useState(["cpu", "memory", "pods", "nodes"])
+  const [selectedStats, setSelectedStats] = useState<string[]>(["cpu", "memory", "pods", "nodes"])
   const [timeRange, setTimeRange] = useState("12h")
+  const [data, setData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+  const [clusters, setClusters] = useState<ClusterConfig[]>([])
   const [isAddClusterOpen, setIsAddClusterOpen] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Check authentication on mount
+  // Check authentication
   useEffect(() => {
-    const checkAuth = () => {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        setIsAuthenticated(false)
-        router.push('/login')
-      } else {
-        setIsAuthenticated(true)
-      }
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+      setIsAuthenticated(false)
+    } else {
+      setIsAuthenticated(true)
     }
-    checkAuth()
   }, [router])
 
-  // Fetch clusters on authentication
+  // Fetch clusters
   useEffect(() => {
     if (!isAuthenticated) return
 
     const fetchClusters = async () => {
       try {
         const token = localStorage.getItem('token')
+        
+        if (!token) {
+          setIsLoading(false)
+          return
+        }
+
         const response = await fetch(`${API_URL}/clusters`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -124,11 +63,12 @@ export default function Home() {
           const fetchedClusters = await response.json()
           setClusters(fetchedClusters)
         } else if (response.status === 401) {
-          setIsAuthenticated(false)
           router.push('/login')
         }
       } catch (error) {
         console.error('클러스터 목록 조회 실패:', error)
+      } finally {
+        setIsLoading(false)
       }
     }
     
@@ -137,7 +77,10 @@ export default function Home() {
 
   // Fetch metrics data
   useEffect(() => {
-    if (!isAuthenticated || clusters.length === 0) return
+    if (!isAuthenticated || clusters.length === 0) {
+      setIsLoading(false)
+      return
+    }
 
     const fetchData = async () => {
       try {
@@ -166,7 +109,7 @@ export default function Home() {
     }
 
     fetchData()
-    const interval = setInterval(fetchData, 30000) // Refresh every 30 seconds
+    const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
   }, [selectedCluster, selectedStats, timeRange, clusters, isAuthenticated])
 
@@ -175,12 +118,6 @@ export default function Home() {
     try {
       const token = localStorage.getItem('token')
       
-      if (!token) {
-        alert('로그인이 필요합니다.')
-        router.push('/login')
-        return
-      }
-
       const response = await fetch(`${API_URL}/clusters`, {
         method: 'POST',
         headers: {
@@ -200,7 +137,6 @@ export default function Home() {
       if (response.ok) {
         const newCluster = await response.json()
         setClusters([...clusters, newCluster])
-        setIsAddClusterOpen(false)
         alert('클러스터가 성공적으로 등록되었습니다!')
       } else {
         const error = await response.json()
@@ -228,14 +164,10 @@ export default function Home() {
       })
 
       if (response.ok) {
-        const updatedClusters = clusters.filter(c => c.id !== clusterId)
-        setClusters(updatedClusters)
-        
-        // If deleted cluster was selected, switch to 'all'
+        setClusters(clusters.filter(c => c.id !== clusterId))
         if (selectedCluster === clusterId) {
           setSelectedCluster('all')
         }
-        
         alert('클러스터가 삭제되었습니다.')
       } else {
         alert('클러스터 삭제에 실패했습니다.')
@@ -246,85 +178,26 @@ export default function Home() {
     }
   }
 
-  // Handle manual refresh
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    try {
-      const token = localStorage.getItem('token')
-      
-      // Refresh clusters
-      const clustersResponse = await fetch(`${API_URL}/clusters`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      if (clustersResponse.ok) {
-        const fetchedClusters = await clustersResponse.json()
-        setClusters(fetchedClusters)
-      }
-      
-      // Refresh stats
-      const statsResponse = await fetch(
-        `${API_URL}/k8s/stats?clusterId=${selectedCluster}&stats=${selectedStats.join(",")}&timeRange=${timeRange}`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }
-      )
-      if (statsResponse.ok) {
-        const result = await statsResponse.json()
-        setData(result)
-      }
-    } catch (error) {
-      console.error('Refresh error:', error)
-    } finally {
-      setIsRefreshing(false)
-    }
-  }
-
-  // Handle logout
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    router.push('/login')
-  }
-
   // Loading state
   if (isAuthenticated === null) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
+    return <div>Loading...</div>
   }
 
   // Redirect state
   if (isAuthenticated === false) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">Redirecting to login...</p>
-        </div>
-      </div>
-    )
+    return <div>Redirecting to login...</div>
   }
 
-  // Empty state - no clusters
+  // Empty state
   if (clusters.length === 0 && !isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b border-border bg-card">
           <div className="container mx-auto px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-semibold text-foreground">Multi-Cloud K8s Dashboard</h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Monitor your Kubernetes clusters across cloud providers
-                </p>
-              </div>
-              <Button variant="ghost" size="icon" onClick={handleLogout}>
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
+            <h1 className="text-2xl font-semibold text-foreground">Multi-Cloud K8s Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Monitor your Kubernetes clusters across cloud providers
+            </p>
           </div>
         </header>
         <EmptyState onAddCluster={() => setIsAddClusterOpen(true)} />
@@ -350,84 +223,65 @@ export default function Home() {
                 Monitor your Kubernetes clusters across cloud providers
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="outline" 
-                size="icon"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-              >
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              </Button>
-              <Select value={timeRange} onValueChange={setTimeRange}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1h">Last 1 hour</SelectItem>
-                  <SelectItem value="6h">Last 6 hours</SelectItem>
-                  <SelectItem value="12h">Last 12 hours</SelectItem>
-                  <SelectItem value="24h">Last 24 hours</SelectItem>
-                  <SelectItem value="7d">Last 7 days</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="ghost" size="icon" onClick={handleLogout}>
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1h">Last 1 hour</SelectItem>
+                <SelectItem value="6h">Last 6 hours</SelectItem>
+                <SelectItem value="12h">Last 12 hours</SelectItem>
+                <SelectItem value="24h">Last 24 hours</SelectItem>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
-        {/* Cluster Selector */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Select Cluster</h2>
-            <Button onClick={() => setIsAddClusterOpen(true)} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Cluster
+      <div className="container mx-auto px-6 py-6">
+        {/* Controls */}
+        <div className="flex flex-col lg:flex-row gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <CloudProviderSelector
+              selected={selectedCluster}
+              onSelect={setSelectedCluster}
+              clusters={clusters} 
+            />
+            <Button
+              onClick={() => setIsAddClusterOpen(true)}
+              size="icon"
+              variant="outline"
+              className="h-10 w-10 shrink-0"
+              title="Add new cluster"
+            >
+              <span className="text-lg">+</span>
             </Button>
           </div>
-          <CloudProviderSelector 
-            selected={selectedCluster} 
-            onSelect={setSelectedCluster} 
-            clusters={clusters}
-            onDeleteCluster={handleDeleteCluster}
-          />
-          {selectedCluster !== 'all' && (
-            <div className="text-sm text-muted-foreground mt-2">
-              Viewing: {clusters.find(c => c.id === selectedCluster)?.name || 'All Clusters'}
-            </div>
-          )}
+          <StatSelector selected={selectedStats} onSelect={setSelectedStats} />
         </div>
 
-        {/* Stats Toggle */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4">Metrics</h2>
-          <StatsToggle selected={selectedStats} onToggle={setSelectedStats} />
-        </div>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-muted-foreground">Loading cluster statistics...</div>
+          </div>
+        )}
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
-            <p className="font-semibold">Error loading data</p>
-            <p className="text-sm">{error.message}</p>
-          </div>
+          <Card className="border-destructive">
+            <CardContent className="pt-6">
+              <p className="text-destructive">Failed to load statistics. Please try again.</p>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Loading State for Metrics */}
-        {isLoading && !data && (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading metrics...</p>
-          </div>
-        )}
-
-        {/* Metrics Grid */}
-        {data && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* Dashboard Content */}
+        {data && !isLoading && (
+          <div className="space-y-6">
+            {/* Overview Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {selectedStats.includes("cpu") && data.metrics.cpu && (
                 <MetricCard
                   title="CPU Usage"
@@ -491,105 +345,72 @@ export default function Home() {
                   status={data.metrics.storage.status}
                 />
               )}
-              {selectedStats.includes("network") && data.metrics.network && (
-                <MetricCard
-                  title="Network Traffic"
-                  value={data.metrics.network.current}
-                  unit="Mbps"
-                  trend={data.metrics.network.trend}
-                  status={data.metrics.network.status}
-                />
-              )}
             </div>
 
             {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {selectedStats.includes("cpu") && data.charts.cpu && (
-                <ChartCard 
-                  title="CPU Usage Over Time" 
-                  data={data.charts.cpu} 
-                  timeRange={timeRange} 
-                />
+                <ChartCard title="CPU Usage Over Time" data={data.charts.cpu} timeRange={timeRange} />
               )}
               {selectedStats.includes("memory") && data.charts.memory && (
-                <ChartCard 
-                  title="Memory Usage Over Time" 
-                  data={data.charts.memory} 
-                  timeRange={timeRange} 
-                />
+                <ChartCard title="Memory Usage Over Time" data={data.charts.memory} timeRange={timeRange} />
               )}
               {selectedStats.includes("pods") && data.charts.pods && (
-                <ChartCard 
-                  title="Pod Count Over Time" 
-                  data={data.charts.pods} 
-                  timeRange={timeRange} 
-                />
+                <ChartCard title="Pod Count Over Time" data={data.charts.pods} timeRange={timeRange} />
               )}
               {selectedStats.includes("nodes") && data.charts.nodes && (
-                <ChartCard 
-                  title="Node Count Over Time" 
-                  data={data.charts.nodes} 
-                  timeRange={timeRange} 
-                />
+                <ChartCard title="Node Count Over Time" data={data.charts.nodes} timeRange={timeRange} />
               )}
               {selectedStats.includes("storage") && data.charts.storage && (
-                <ChartCard 
-                  title="Storage Usage Over Time" 
-                  data={data.charts.storage} 
-                  timeRange={timeRange} 
-                />
-              )}
-              {selectedStats.includes("network") && data.charts.network && (
-                <ChartCard 
-                  title="Network Traffic Over Time" 
-                  data={data.charts.network} 
-                  timeRange={timeRange} 
-                />
+                <ChartCard title="Storage Usage Over Time" data={data.charts.storage} timeRange={timeRange} />
               )}
               {selectedStats.includes("requests") && data.charts.requests && (
-                <ChartCard 
-                  title="API Requests Over Time" 
-                  data={data.charts.requests} 
-                  timeRange={timeRange} 
-                />
+                <ChartCard title="API Requests Over Time" data={data.charts.requests} timeRange={timeRange} />
               )}
               {selectedStats.includes("errors") && data.charts.errors && (
-                <ChartCard 
-                  title="Error Rate Over Time" 
-                  data={data.charts.errors} 
-                  timeRange={timeRange} 
-                />
+                <ChartCard title="Error Rate Over Time" data={data.charts.errors} timeRange={timeRange} />
               )}
             </div>
 
-            {/* Cluster Cards */}
+            {/* Clusters Info */}
             {data.clusters && data.clusters.length > 0 && (
-              <>
-                <h2 className="text-lg font-semibold mb-4">Cluster Status</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {data.clusters.map((cluster) => (
-                    <ClusterCard
-                      key={cluster.id}
-                      id={cluster.id}
-                      name={cluster.name}
-                      provider={cluster.provider}
-                      status={cluster.status}
-                      nodes={cluster.nodes}
-                      pods={cluster.pods}
-                      version={cluster.version}
-                      onDelete={handleDeleteCluster}
-                      onSelect={() => setSelectedCluster(cluster.id)}
-                      isSelected={selectedCluster === cluster.id}
-                    />
-                  ))}
-                </div>
-              </>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Registered Clusters</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {data.clusters.map((cluster: any) => (
+                      <div key={cluster.id} className="flex items-center justify-between border-b pb-2">
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <p className="font-medium">{cluster.name}</p>
+                            <p className="text-sm text-muted-foreground">{cluster.provider}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span>Nodes: {cluster.nodes}</span>
+                          <span>Pods: {cluster.pods}</span>
+                          <span className="text-xs">{cluster.version}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteCluster(cluster.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             )}
-          </>
+          </div>
         )}
       </div>
 
-      {/* Add Cluster Dialog */}
       <AddClusterDialog 
         open={isAddClusterOpen} 
         onOpenChange={setIsAddClusterOpen} 
