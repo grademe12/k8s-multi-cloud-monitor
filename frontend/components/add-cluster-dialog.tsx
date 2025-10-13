@@ -128,7 +128,7 @@ export function AddClusterDialog({ open, onOpenChange, onAddCluster }: AddCluste
               <Label htmlFor="token">Service Account Token *</Label>
               <Input
                 id="token"
-                type="text"
+                type="password"
                 placeholder="Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6..."
                 value={formData.token || ""}
                 onChange={(e) => setFormData({ ...formData, token: e.target.value })}
