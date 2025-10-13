@@ -70,4 +70,23 @@ export class AuthService {
       },
     };
   }
+
+  // 사용자 ID로 정보 조회 (추가)
+  async getUserById(userId: string) {
+    const user = await this.userRepository.findOne({ 
+      where: { id: userId },
+      select: ['id', 'email', 'name', 'createdAt'] 
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('사용자를 찾을 수 없습니다');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      createdAt: user.createdAt,
+    };
+  }
 }
