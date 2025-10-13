@@ -11,13 +11,14 @@ import { ChartCard } from "@/components/chart-card"
 import { EmptyState } from "@/components/empty-state"
 import { AddClusterDialog, type ClusterConfig } from "@/components/add-cluster-dialog"
 import { useRouter } from "next/navigation"
-import { Trash2 } from "lucide-react"
+import { Trash2, LogOut } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 export default function Dashboard() {
   const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const [currentUser, setCurrentUser] = useState<{ id: string; email: string; name: string } | null>(null)
   
   // Data states
   const [selectedCluster, setSelectedCluster] = useState("all")
@@ -29,15 +30,44 @@ export default function Dashboard() {
   const [clusters, setClusters] = useState<ClusterConfig[]>([])
   const [isAddClusterOpen, setIsAddClusterOpen] = useState(false)
 
-  // Check authentication
+  // Check authentication and fetch user info
   useEffect(() => {
     const token = localStorage.getItem('token')
+    
     if (!token) {
       router.push('/login')
       setIsAuthenticated(false)
-    } else {
-      setIsAuthenticated(true)
+      return
     }
+
+    // 서버에서 사용자 정보 가져오기
+    const fetchUserInfo = async () => {
+      try {
+        const response = await fetch(`${API_URL}/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const userData = await response.json()
+          setCurrentUser(userData)
+          setIsAuthenticated(true)
+        } else if (response.status === 401) {
+          // 토큰이 유효하지 않음
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          router.push('/login')
+          setIsAuthenticated(false)
+        }
+      } catch (error) {
+        console.error('사용자 정보 조회 실패:', error)
+        router.push('/login')
+        setIsAuthenticated(false)
+      }
+    }
+
+    fetchUserInfo()
   }, [router])
 
   // Fetch clusters
@@ -178,14 +208,49 @@ export default function Dashboard() {
     }
   }
 
+  // Handle logout
+  const handleLogout = async () => {
+    if (!confirm('로그아웃 하시겠습니까?')) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      
+      // 백엔드에 로그아웃 알림 (로그 기록용 - 선택적)
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+    } catch (error) {
+      console.error('로그아웃 API 호출 실패:', error)
+      // API 실패해도 로컬 토큰은 삭제
+    } finally {
+      // 로컬 스토리지에서 토큰 삭제
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      router.push('/login')
+    }
+  }
+
   // Loading state
   if (isAuthenticated === null) {
-    return <div>Loading...</div>
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">로딩 중...</div>
+      </div>
+    )
   }
 
   // Redirect state
   if (isAuthenticated === false) {
-    return <div>Redirecting to login...</div>
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">로그인 페이지로 이동 중...</div>
+      </div>
+    )
   }
 
   // Empty state
@@ -194,10 +259,29 @@ export default function Dashboard() {
       <div className="min-h-screen bg-background">
         <header className="border-b border-border bg-card">
           <div className="container mx-auto px-6 py-4">
-            <h1 className="text-2xl font-semibold text-foreground">Multi-Cloud K8s Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Monitor your Kubernetes clusters across cloud providers
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold text-foreground">Multi-Cloud K8s Dashboard</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Monitor your Kubernetes clusters across cloud providers
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-sm">
+                  <div className="font-medium">{currentUser?.name}</div>
+                  <div className="text-muted-foreground text-xs">{currentUser?.email}</div>
+                </div>
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  로그아웃
+                </Button>
+              </div>
+            </div>
           </div>
         </header>
         <EmptyState onAddCluster={() => setIsAddClusterOpen(true)} />
@@ -223,18 +307,33 @@ export default function Dashboard() {
                 Monitor your Kubernetes clusters across cloud providers
               </p>
             </div>
-            <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1h">Last 1 hour</SelectItem>
-                <SelectItem value="6h">Last 6 hours</SelectItem>
-                <SelectItem value="12h">Last 12 hours</SelectItem>
-                <SelectItem value="24h">Last 24 hours</SelectItem>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-4">
+              <div className="text-sm">
+                <div className="font-medium">{currentUser?.name}</div>
+                <div className="text-muted-foreground text-xs">{currentUser?.email}</div>
+              </div>
+              <Select value={timeRange} onValueChange={setTimeRange}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1h">Last 1 hour</SelectItem>
+                  <SelectItem value="6h">Last 6 hours</SelectItem>
+                  <SelectItem value="12h">Last 12 hours</SelectItem>
+                  <SelectItem value="24h">Last 24 hours</SelectItem>
+                  <SelectItem value="7d">Last 7 days</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                로그아웃
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -379,28 +478,23 @@ export default function Dashboard() {
                   <CardTitle>Registered Clusters</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {data.clusters.map((cluster: any) => (
-                      <div key={cluster.id} className="flex items-center justify-between border-b pb-2">
-                        <div className="flex items-center gap-3">
-                          <div>
-                            <p className="font-medium">{cluster.name}</p>
-                            <p className="text-sm text-muted-foreground">{cluster.provider}</p>
+                      <div key={cluster.id} className="flex justify-between items-center p-3 border rounded-lg">
+                        <div>
+                          <div className="font-medium">{cluster.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {cluster.provider} • {cluster.nodes} nodes • {cluster.pods} pods
                           </div>
                         </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span>Nodes: {cluster.nodes}</span>
-                          <span>Pods: {cluster.pods}</span>
-                          <span className="text-xs">{cluster.version}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteCluster(cluster.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteCluster(cluster.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     ))}
                   </div>
