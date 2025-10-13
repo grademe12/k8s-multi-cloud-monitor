@@ -14,6 +14,11 @@ export class AuthService {
   ) {}
 
   async register(email: string, password: string, name: string) {
+    // 비밀번호 검증 (추가)
+    if (password.length < 10) {
+      throw new BadRequestException('비밀번호는 최소 10자 이상이어야 합니다');
+    }
+
     // 중복 체크
     const exists = await this.userRepository.findOne({ where: { email } });
     if (exists) {
@@ -71,7 +76,6 @@ export class AuthService {
     };
   }
 
-  // 사용자 ID로 정보 조회 (추가)
   async getUserById(userId: string) {
     const user = await this.userRepository.findOne({ 
       where: { id: userId },
