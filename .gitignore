@@ -1,6 +1,10 @@
 .terraform/
 .terraform.*
 
+*.tfvars
+*.tfstate
+*.tfstate.*
+
 #******************** Nest.js *********************
 # compiled output
 **/dist
