@@ -14,6 +14,7 @@ import axios from 'axios';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cluster } from '../clusters/entities/cluster.entity';
+import { EncryptionService } from 'src/common/encryption.service';
 
 @Injectable()
 export class K8sService {
@@ -24,6 +25,7 @@ export class K8sService {
     private metricsCollector: MetricsCollectorService,
     @InjectRepository(Cluster)
     private clusterRepository: Repository<Cluster>,
+    private encryptionService: EncryptionService,
   ) {
     // this.initializeCluster();
   }
@@ -62,6 +64,8 @@ export class K8sService {
    */
   private createKubeConfig(cluster: Cluster): k8s.KubeConfig {
     const kubeConfig = new k8s.KubeConfig();
+
+    const decryptedToken = this.encryptionService.decrypt(cluster.token);
     
     kubeConfig.loadFromOptions({
       clusters: [{
@@ -71,7 +75,7 @@ export class K8sService {
       }],
       users: [{
         name: `${cluster.name}-user`,
-        token: cluster.token,
+        token: decryptedToken,
       }],
       contexts: [{
         name: `${cluster.name}-context`,

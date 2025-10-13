@@ -180,7 +180,7 @@ export default function Dashboard() {
 
   // Handle cluster deletion
   const handleDeleteCluster = async (clusterId: string) => {
-    if (!confirm('정말로 이 클러스터를 삭제하시겠습니까?')) {
+    if (!confirm('정말로 이 클러스터를 삭제하시겠습니까?\n지금까지 저장된 메트릭 데이터도 함께 삭제됩니다.')) {
       return
     }
 

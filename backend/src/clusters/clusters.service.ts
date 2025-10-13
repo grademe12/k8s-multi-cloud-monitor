@@ -1,16 +1,17 @@
+// backend/src/clusters/clusters.service.ts
+
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cluster } from './entities/cluster.entity';
-import { Metric } from '../k8s/entities/metric.entity';
+import { EncryptionService } from '../common/encryption.service';
 
 @Injectable()
 export class ClustersService {
   constructor(
     @InjectRepository(Cluster)
     private clusterRepository: Repository<Cluster>,
-    @InjectRepository(Metric)
-    private metricRepository: Repository<Metric>,
+    private encryptionService: EncryptionService,  // ← 추가
   ) {}
 
   async create(data: {
@@ -22,22 +23,43 @@ export class ClustersService {
     token: string;
     userId: string;
   }) {
+    // 1. Bearer 제거
     if (data.token.toLowerCase().startsWith('bearer ')) {
       data.token = data.token.substring(7);
     }
     
-    const cluster = this.clusterRepository.create(data);
-    
+    // 2. 연결 테스트 (암호화 전 원본 토큰으로)
     try {
-      await this.testClusterConnection(cluster);
+      await this.testClusterConnection({
+        ...data,
+        token: data.token,
+      } as Cluster);
     } catch (error) {
       throw new BadRequestException(`클러스터 연결 실패: ${error.message}`);
     }
     
+    // 3. 토큰 암호화 ← 새로 추가
+    const encryptedToken = this.encryptionService.encrypt(data.token);
+    
+    // 4. 암호화된 토큰으로 저장
+    const cluster = this.clusterRepository.create({
+      ...data,
+      token: encryptedToken,
+    });
+    
     await this.clusterRepository.save(cluster);
     
+    // token 제외하고 반환
     const { token, ...result } = cluster;
     return result;
+  }
+
+  /**
+   * 복호화된 토큰 가져오기 (내부 사용용)
+   */
+  async getDecryptedToken(clusterId: string, userId: string): Promise<string> {
+    const cluster = await this.findOne(clusterId, userId);
+    return this.encryptionService.decrypt(cluster.token);
   }
 
   private async testClusterConnection(cluster: Cluster): Promise<void> {
@@ -52,7 +74,7 @@ export class ClustersService {
       }],
       users: [{
         name: `${cluster.name}-user`,
-        token: cluster.token,
+        token: cluster.token, // 평문 토큰 사용
       }],
       contexts: [{
         name: `${cluster.name}-context`,
@@ -87,6 +109,15 @@ export class ClustersService {
 
   async update(id: string, userId: string, data: Partial<Cluster>) {
     const cluster = await this.findOne(id, userId);
+    
+    // 토큰 업데이트 시 암호화
+    if (data.token) {
+      if (data.token.toLowerCase().startsWith('bearer ')) {
+        data.token = data.token.substring(7);
+      }
+      data.token = this.encryptionService.encrypt(data.token);
+    }
+    
     Object.assign(cluster, data);
     await this.clusterRepository.save(cluster);
     
@@ -94,18 +125,9 @@ export class ClustersService {
     return result;
   }
 
-  // 🔥 메트릭도 함께 삭제하도록 수정
   async remove(id: string, userId: string) {
     const cluster = await this.findOne(id, userId);
-    
-    // 1. 해당 클러스터의 메트릭 먼저 삭제
-    await this.metricRepository.delete({ clusterId: id });
-    console.log(`✅ Deleted all metrics for cluster: ${id}`);
-    
-    // 2. 클러스터 삭제
     await this.clusterRepository.remove(cluster);
-    console.log(`✅ Deleted cluster: ${id}`);
-    
-    return { message: 'Cluster and its metrics deleted successfully' };
+    return { message: 'Cluster deleted successfully' };
   }
 }
