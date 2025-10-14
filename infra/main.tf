@@ -1,3 +1,5 @@
+#define main providers
+
 terraform {
   required_providers {
     ncloud = {
@@ -11,7 +13,9 @@ terraform {
     endpoint = "kr.object.ncloudstorage.com"
     region = "ap-northeast-2"
     bucket = "woosupar-multi-cloud"
-    key = "prod/terraform.tfstate"
+    key = "develop/terraform.tfstate"
+
+    profile = "ncloud"
 
     skip_credentials_validation = true
     skip_metadata_api_check = true

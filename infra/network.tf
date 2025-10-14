@@ -7,7 +7,7 @@ resource "ncloud_vpc" "ncloud_vpc" {
 
 resource "ncloud_nat_gateway" "nat" {
   vpc_no = ncloud_vpc.ncloud_vpc.id
-  subnet_no = ncloud_subnet.public_subnet.id
+  subnet_no = ncloud_subnet.nat_subnet.id
   zone = var.zone
   name = "nat"
 }
@@ -41,14 +41,24 @@ resource "ncloud_network_acl" "nacl" {
   vpc_no = ncloud_vpc.ncloud_vpc.id
 }
 
-resource "ncloud_subnet" "public_subnet" {
-  name = "public_subnet"
+resource "ncloud_subnet" "nat_subnet" {
+  name = "nat_subnet"
   vpc_no = ncloud_vpc.ncloud_vpc.id
   subnet = "10.0.1.0/24"
   network_acl_no = ncloud_network_acl.nacl.id
   subnet_type = "PUBLIC"
   zone = var.zone
   usage_type = "NATGW"
+}
+
+resource "ncloud_subnet" "lb_subnet" {
+  name = "lb_subnet"
+  vpc_no = ncloud_vpc.ncloud_vpc.id
+  subnet = "10.0.4.0/24"
+  network_acl_no = ncloud_network_acl.nacl.id
+  subnet_type = "PUBLIC"
+  zone = var.zone
+  usage_type = "LOADB"
 }
 
 resource "ncloud_subnet" "private_subnet1" {
