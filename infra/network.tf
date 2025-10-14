@@ -61,10 +61,30 @@ resource "ncloud_subnet" "lb_subnet" {
   usage_type = "LOADB"
 }
 
+resource "ncloud_subnet" "lb_private_subnet" {
+  name = "lb-private-subnet"
+  vpc_no = ncloud_vpc.ncloud_vpc.id
+  subnet = "10.0.5.0/24"
+  network_acl_no = ncloud_network_acl.nacl.id
+  subnet_type = "PRIVATE"
+  zone = var.zone
+  usage_type = "LOADB"
+}
+
 resource "ncloud_subnet" "private_subnet1" {
     name = "private-subnet1"
     vpc_no = ncloud_vpc.ncloud_vpc.id
     subnet = "10.0.2.0/24"
+    network_acl_no = ncloud_network_acl.nacl.id #임시
+    subnet_type = "PRIVATE"
+    zone = "KR-1"
+    usage_type = "GEN"
+}
+
+resource "ncloud_subnet" "private_subnet3" {
+    name = "private-subnet3"
+    vpc_no = ncloud_vpc.ncloud_vpc.id
+    subnet = "10.0.10.0/24"
     network_acl_no = ncloud_network_acl.nacl.id #임시
     subnet_type = "PRIVATE"
     zone = "KR-1"
