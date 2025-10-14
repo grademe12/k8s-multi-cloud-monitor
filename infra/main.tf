@@ -1,32 +1,21 @@
 #define main providers
 
-terraform {
-  required_providers {
-    ncloud = {
-      source = "NaverCloudPlatform/ncloud"
-      version = "4.0.4"
-    }
-  }
-  required_version = ">= 0.13"
+# terraform {
+#   backend "s3" {
+#     access_key = var.access_key
+#     secret_key = var.secret_key
+#     endpoints = {
+#       s3 = "https://kr.object.ncloudstorage.com"
+#     }
 
-  backend "s3" {
-    endpoint = "kr.object.ncloudstorage.com"
-    region = "ap-northeast-2"
-    bucket = "woosupar-multi-cloud"
-    key = "develop/terraform.tfstate"
+#     bucket = "woosupar-tfstate"
+#     region = "KR"
+#     key = "develop/terraform.tfstate"
 
-    profile = "ncloud"
-
-    skip_credentials_validation = true
-    skip_metadata_api_check = true
-    force_path_style = true
-  }
-}
-
-// Configure the ncloud provider
-provider "ncloud" {
-  access_key  = var.access_key
-  secret_key  = var.secret_key
-  region      = var.region
-  support_vpc = true
-}
+#     skip_credentials_validation = true
+#     skip_metadata_api_check = true
+#     skip_requesting_account_id = true
+#     skip_region_validation = true
+#     skip_s3_checksum = true
+#   }
+# }

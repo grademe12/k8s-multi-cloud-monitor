@@ -30,12 +30,12 @@ output "cluster_endpoint" {
   sensitive = true
 }
 
-resource "local_file" "kubeconfig" {
-  content = ncloud_nks_cluster.cluster.kubeconfig
-  filename = "${path.module}/kubeconfig.yaml"
-  file_permission = "0600"
-}
+# resource "local_file" "kubeconfig" {
+#   content = ncloud_nks_cluster.cluster.
+#   filename = "${path.module}/kubeconfig.yaml"
+#   file_permission = "0600"
+# }
 
-output "kubeconfig_path" {
-  value = local_file.kubeconfig.filename
-}
+# output "kubeconfig_path" {
+#   value = local_file.kubeconfig.filename
+# }

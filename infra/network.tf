@@ -1,7 +1,7 @@
 #define network resource
 
 resource "ncloud_vpc" "ncloud_vpc" {
-  name = "ncloud_vpc"
+  name = "ncloud-vpc"
   ipv4_cidr_block = "10.0.0.0/16"
 }
 
@@ -42,7 +42,7 @@ resource "ncloud_network_acl" "nacl" {
 }
 
 resource "ncloud_subnet" "nat_subnet" {
-  name = "nat_subnet"
+  name = "nat-subnet"
   vpc_no = ncloud_vpc.ncloud_vpc.id
   subnet = "10.0.1.0/24"
   network_acl_no = ncloud_network_acl.nacl.id
@@ -52,7 +52,7 @@ resource "ncloud_subnet" "nat_subnet" {
 }
 
 resource "ncloud_subnet" "lb_subnet" {
-  name = "lb_subnet"
+  name = "lb-subnet"
   vpc_no = ncloud_vpc.ncloud_vpc.id
   subnet = "10.0.4.0/24"
   network_acl_no = ncloud_network_acl.nacl.id
@@ -62,7 +62,7 @@ resource "ncloud_subnet" "lb_subnet" {
 }
 
 resource "ncloud_subnet" "private_subnet1" {
-    name = "private_subnet1"
+    name = "private-subnet1"
     vpc_no = ncloud_vpc.ncloud_vpc.id
     subnet = "10.0.2.0/24"
     network_acl_no = ncloud_network_acl.nacl.id #임시
@@ -72,7 +72,7 @@ resource "ncloud_subnet" "private_subnet1" {
 }
 
 resource "ncloud_subnet" "private_subnet2" {
-    name = "private_subnet2"
+    name = "private-subnet2"
     vpc_no = ncloud_vpc.ncloud_vpc.id
     subnet = "10.0.3.0/24"
     network_acl_no = ncloud_network_acl.nacl.id #임시

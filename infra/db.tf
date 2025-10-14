@@ -7,8 +7,10 @@ resource "ncloud_postgresql" "db" {
   user_password = var.db_password
   vpc_no = ncloud_vpc.ncloud_vpc.id
   subnet_no = ncloud_subnet.private_subnet1.id
-  database_name = "k-paas"
+  database_name = "k_paas"
   client_cidr = "10.0.0.0/16"
+  ha = false
+  backup = false
 }
 
 output "db_port" {
