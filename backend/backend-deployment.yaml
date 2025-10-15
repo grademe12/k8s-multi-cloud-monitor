@@ -1,0 +1,37 @@
+# k8s/backend-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      imagePullSecrets:
+      - name: registry-credentials
+      
+      containers:
+      - name: backend
+        image: multi-cloud.kr.ncr.ntruss.com/backend:v1.0
+        ports:
+        - containerPort: 3001
+        
+        # .env의 모든 환경변수를 한 번에 가져오기
+        envFrom:
+        - secretRef:
+            name: backend-env
+        
+        # 추가 환경변수 (필요시)
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3001"

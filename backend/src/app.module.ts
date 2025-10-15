@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { User } from './auth/entities/user.entity';
 import { Cluster } from './clusters/entities/cluster.entity';
 import { ClustersModule } from './clusters/clusters.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ClustersModule } from './clusters/clusters.module';
       synchronize: true,
     }),
     ScheduleModule.forRoot(),
+    CommonModule,
     K8sModule,  // 추가
     AuthModule,
     ClustersModule,
