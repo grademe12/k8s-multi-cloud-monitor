@@ -30,6 +30,7 @@ import { CommonModule } from './common/common.module';
         password: configService.get('DATABASE_PASSWORD'),
         database: configService.get('DATABASE_NAME'),
         entities: [Metric, User, Cluster],
+        schema: 'app',
         synchronize: configService.get('NODE_ENV') !== 'production',  // Dev만 true
         ssl: false,
       }),

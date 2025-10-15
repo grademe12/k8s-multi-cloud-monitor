@@ -1,0 +1,20 @@
+0. access key 와 secret access key 설정. 환경변수 > ~/.ncloud/configure 순으로 키를 검색함.
+
+1. db에 연결된 ACG에 접속 권한 설정
+
+2. postgre의 경우 schema에 대한 권한 관리가 필요함. 별도의 서버에서 db에 접속하는 수밖에 없음..
+
+3. 현재 sdk checksum 문제 있음. 문의내역 참고.
+
+4. iam authenticater 를 따로 설치해서 사용해야 함.
+
+5. object storage를 정적호스팅 가능하게 설정. terraform 으로 가능한지는 모르겠음.
+
+6. 로드밸런서에 별도의 ACL 설정.
+
+7. iam authenticater를 통해 kubeconfig를 로컬에 설치해서 kubectl 명령어 사용할 수 있게 함.
+
+8. docker registry의 경우 terraform 으로 생성 불가능. 수동생성하고 object storage와 연결
+
+9. kubectl 명령어를 사용해서 준비된 public subnet에 인그레스 컨트롤러를 로드밸런서 유형으로 배포
+
