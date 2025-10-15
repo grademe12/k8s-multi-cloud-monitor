@@ -20,7 +20,7 @@ spec:
       
       containers:
       - name: backend
-        image: multi-cloud.kr.ncr.ntruss.com/backend:v1.0
+        image: multi-cloud.kr.ncr.ntruss.com/backend:v1.4
         ports:
         - containerPort: 3001
         
