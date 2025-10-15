@@ -26,8 +26,10 @@ jobs:
       run: |
         curl -o ncp-iam-authenticator -L https://github.com/NaverCloudPlatform/ncp-iam-authenticator/releases/latest/download/ncp-iam-authenticator_linux_amd64
         chmod +x ./ncp-iam-authenticator
-        mkdir -p $HOME/bin && cp ./ncp-iam-authenticator $HOME/bin/ncp-iam-authenticator && export PATH=$PATH:$HOME/bin
-        echo 'export PATH=$PATH:$HOME/bin' >> ~/.bash_profile
+        mkdir -p $HOME/bin
+        mv ./ncp-iam-authenticator $HOME/bin/ncp-iam-authenticator
+        # GitHub Actions에서는 GITHUB_PATH 사용
+        echo "$HOME/bin" >> $GITHUB_PATH
 
     - name: Login to Naver Container Registry
       uses: docker/login-action@v2
@@ -60,6 +62,8 @@ jobs:
         mkdir -p $HOME/.kube
         echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
         chmod 600 $HOME/.kube/config
+        # PATH 다시 확인
+        export PATH=$PATH:/usr/local/bin
         kubectl version --client
 
     - name: Update Deployment YAML with new image
