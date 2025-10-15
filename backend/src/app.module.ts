@@ -41,5 +41,6 @@ import { CommonModule } from './common/common.module';
     AuthModule,
     ClustersModule,
   ],
+  controllers: [AppController]
 })
 export class AppModule {}
