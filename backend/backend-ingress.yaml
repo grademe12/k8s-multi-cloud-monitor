@@ -2,9 +2,10 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: backend-ingress
-  annotations:
-    ingressClassName: alb  # ALB 사용!
+  # annotations:
+    # ingressClassName: alb  # ALB 사용!
 spec:
+  ingressClassName: alb
   rules:
   - http:
       paths:
