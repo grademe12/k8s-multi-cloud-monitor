@@ -1,9 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, ManyToOne, CreateDateColumn, BeforeInsert } from 'typeorm';
 import { User } from '../../auth/entities/user.entity';
+import { randomUUID } from 'crypto';
 
 @Entity()
 export class Cluster {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn('uuid')
   id: string;
 
   @Column()
@@ -21,7 +22,7 @@ export class Cluster {
   @Column({ nullable: true })
   version: string;
 
-  @Column({ select: false })  // 조회 시 기본적으로 제외
+  @Column({ select: false })
   token: string;
 
   @ManyToOne(() => User, user => user.clusters)
@@ -32,4 +33,11 @@ export class Cluster {
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @BeforeInsert()
+  generateId() {
+    if (!this.id) {
+      this.id = randomUUID();
+    }
+  }
 }

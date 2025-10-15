@@ -32,6 +32,6 @@ spec:
         # 추가 환경변수 (필요시)
         env:
         - name: NODE_ENV
-          value: "production"
+          value: "DEV"
         - name: PORT
           value: "3001"
