@@ -29,7 +29,7 @@ export class EncryptionService {
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     
-    const authTag = cipher.getAuthTag();
+    const authTag = (cipher as any).getAuthTag();
     
     // IV + AuthTag + 암호화된 데이터를 합쳐서 반환
     return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
@@ -45,7 +45,7 @@ export class EncryptionService {
     const encrypted = parts[2];
     
     const decipher = crypto.createDecipheriv(this.algorithm, this.secretKey, iv);
-    decipher.setAuthTag(authTag);
+    (decipher as any).setAuthTag(authTag);
     
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
