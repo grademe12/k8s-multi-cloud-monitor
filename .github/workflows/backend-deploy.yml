@@ -90,7 +90,7 @@ jobs:
           --from-literal=DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }} \
           --from-literal=DATABASE_NAME=${{ secrets.DATABASE_NAME }} \
           --from-literal=JWT_SECRET=${{ secrets.JWT_SECRET }} \
-          --from-literal=ENCRYPTION_KEY=${{ secrets.ENCRYPTION_SECRET_KEY }}
+          --from-literal=ENCRYPTION_SECRET_KEY=${{ secrets.ENCRYPTION_SECRET_KEY }}
 
     - name: Apply Kubernetes manifests
       run: |
