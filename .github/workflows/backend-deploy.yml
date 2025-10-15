@@ -22,6 +22,16 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
+    - name: Configure NCP credentials
+      run: |
+        mkdir -p $HOME/.ncloud
+        cat > $HOME/.ncloud/configure << EOF
+        [DEFAULT]
+        ncloud_access_key_id = ${{ secrets.NCR_ACCESS_KEY }}
+        ncloud_secret_access_key = ${{ secrets.NCR_SECRET_KEY }}
+        ncloud_api_url = https://ncloud.apigw.ntruss.com
+        EOF
+    
     - name: Install ncp-iam-authenticator
       run: |
         curl -o ncp-iam-authenticator -L https://github.com/NaverCloudPlatform/ncp-iam-authenticator/releases/latest/download/ncp-iam-authenticator_linux_amd64
