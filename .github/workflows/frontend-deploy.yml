@@ -37,6 +37,6 @@ jobs:
       - name: Deploy to Object Storage
         working-directory: ./frontend
         run: |
-          aws s3 sync out/ s3://woosupar-multi-cloud/ \
+          aws s3 sync out/ s3://woosupar-multi-cloud/frontend \
             --endpoint-url=https://kr.object.ncloudstorage.com \
             --delete
