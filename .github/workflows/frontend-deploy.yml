@@ -29,7 +29,7 @@ jobs:
       - name: Build Next.js app
         working-directory:  ./frontend
         env:
-          NEXT_PUBLIC_API_URL: http://ing-default-backendingre-c4948-111293082-bc9e5c2cdce1.kr.lb.naverncp.com
+          NEXT_PUBLIC_API_URL: https://api.pearlinvest.click
         run:  npm run build
 
       - name: Configure AWS CLI for NCP
