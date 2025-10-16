@@ -1,0 +1,42 @@
+name: Frontend
+
+on:
+  push:
+    branches: [ develop ]
+    paths:
+      - 'frontend/**'
+  workflow_dispatch:
+
+  jobs:
+    build-and-deploy:
+      runs-on:  ubuntu-latest
+
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v3
+        
+        - name: Setup Node.js
+          uses: actions/setup-node@v3
+          with:
+            node-versions: '22'
+            cache: 'npm'
+            cache-dependency-path: frontend/package-lock.json
+
+        - name: Build Next.js app
+          working-directory:  ./frontend
+          env:
+            NEXT_PUBLIC_API_URL: http://ing-default-backendingre-c4948-111293082-bc9e5c2cdce1.kr.lb.naverncp.com
+          run:  npm run build
+
+        - name: Configure AWS CLI for NCP
+          run:  |
+            aws configure set aws_access_key_id ${{ secrets.NCR_ACCESS_KEY }}
+            aws configure set aws_secret_access_key ${{ secrets.NCR_SECRET_KEY }}
+            aws configure set default.region kr-standard
+          
+        - name: Deploy to Object Storage
+          working-directory: ./frontend
+          run: |
+            aws s3 sync out/ s3://woosupar-multi-cloud/ \
+              --endpoint-url=https://kr.object.ncloudstorage.com \
+              --delete
