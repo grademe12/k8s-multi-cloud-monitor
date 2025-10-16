@@ -763,17 +763,22 @@ private formatChartData(
  * 시간 포맷 (상대 시간)
  */
 private formatTime(timestamp: Date): string {
+  // timestamp는 이미 KST, Node.js도 KST 환경
   const now = new Date();
-  const diffMs = now.getTime() - timestamp.getTime();
+  const past = new Date(timestamp);
+  
+  const diffMs = now.getTime() - past.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
 
+  if (diffMins < 1) {
+    return 'just now';
+  }
   if (diffHours > 0) {
     return `${diffHours}h ago`;
   }
   return `${diffMins}m ago`;
 }
-
   // /**
   //  * Clusters 정보 조회
   //  */
