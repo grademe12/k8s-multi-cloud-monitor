@@ -15,6 +15,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cluster } from '../clusters/entities/cluster.entity';
 import { EncryptionService } from 'src/common/encryption.service';
+import { findIndex } from 'rxjs';
+import { LOADIPHLPAPI } from 'dns';
 
 @Injectable()
 export class K8sService {
@@ -1257,6 +1259,14 @@ private async getErrorMetricsForCluster(
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async collectAndSaveMetrics() {
+    const lockId = 42;
+
+    const locked = await this.metricsCollector.tryAcquireLock(lockId);
+
+    if (!locked) {
+      console.log(' Another pod is collecting metrics. skip collect job...');
+      return;
+    }
     console.log('🔍 Collecting metrics from all clusters...[START]');
 
     try {
@@ -1281,6 +1291,8 @@ private async getErrorMetricsForCluster(
       console.log('✅ Metrics collection completed [END]');
     } catch (error) {
       console.error('❌ Failed to collect metrics:', error);
+    } finally {
+      await this.metricsCollector.releaseLock(lockId);
     }
   }
 

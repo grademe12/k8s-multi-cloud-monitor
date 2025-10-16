@@ -118,5 +118,35 @@ async getPreviousMetric(
   return previousMetric ? Number(previousMetric.value) : null;
 }
 
+/**
+ * 분산 Lock 획득 시도 (PostgreSQL Advisory Lock)
+ */
+async tryAcquireLock(lockId: number): Promise<boolean> {
+  try {
+    const result = await this.metricsRepository.query(
+      'SELECT pg_try_advisory_lock($1) as locked',
+      [lockId]
+    );
+    return result[0].locked;
+  } catch (error) {
+    console.error('Failed to acquire lock:', error);
+    return false;
+  }
+}
+
+/**
+ * 분산 Lock 해제
+ */
+async releaseLock(lockId: number): Promise<void> {
+  try {
+    await this.metricsRepository.query(
+      'SELECT pg_advisory_unlock($1)',
+      [lockId]
+    );
+  } catch (error) {
+    console.error('Failed to release lock:', error);
+  }
+}
+
 
 }
