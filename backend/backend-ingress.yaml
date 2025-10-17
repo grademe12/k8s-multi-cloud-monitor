@@ -2,8 +2,9 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: backend-ingress
-  # annotations:
-    # ingressClassName: alb  # ALB 사용!
+  annotations:
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP:443"}]'
+    alb.ingress.kubernetes.io/ssl-certificate-no: "52914"
 spec:
   ingressClassName: alb
   rules:
