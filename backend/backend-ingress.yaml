@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: backend-ingress
   annotations:
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP:443"}]'
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS:443"}]'
     alb.ingress.kubernetes.io/ssl-certificate-no: "52914"
 spec:
   ingressClassName: alb
