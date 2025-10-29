@@ -1,7 +1,7 @@
 #define naver kubernetes service
 
 resource "ncloud_login_key" "key" {
-  key_name = "${var.project_name}-login-key"
+  key_name = "${var.project_name}-login-key2"
 }
 
 resource "ncloud_nks_cluster" "cluster" {
@@ -14,6 +14,7 @@ resource "ncloud_nks_cluster" "cluster" {
   lb_private_subnet_no = ncloud_subnet.lb_private_subnet.id
   lb_public_subnet_no  = ncloud_subnet.lb_subnet.id
   zone                 = "KR-1"
+  auth_type            = "API"
 
   access_entries {
     entry = "nrn:PUB:Account::3604371:Customer/static"

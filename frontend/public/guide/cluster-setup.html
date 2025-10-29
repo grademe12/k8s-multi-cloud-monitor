@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>클러스터 등록 가이드 - Multi-Cloud K8s Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 15px;
+            font-weight: 500;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        
+        .tab:hover {
+            color: #667eea;
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .step {
+            margin-bottom: 35px;
+        }
+        
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .step-number {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        
+        .step h3 {
+            font-size: 18px;
+            color: #1f2937;
+        }
+        
+        .step-content {
+            margin-left: 51px;
+        }
+        
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.5;
+            margin: 12px 0;
+        }
+        
+        code {
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+        
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 12px 0;
+        }
+        
+        .warning-box {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 12px 0;
+        }
+        
+        .success-box {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 12px 0;
+        }
+        
+        .method-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .method-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+        }
+        
+        .method-card.recommended {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+        
+        .method-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .method-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge.recommended {
+            background: #10b981;
+            color: white;
+        }
+        
+        .badge.easy {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .method-desc {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .method-details {
+            display: none;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .method-card.expanded .method-details {
+            display: block;
+        }
+        
+        .checklist {
+            list-style: none;
+        }
+        
+        .checklist li {
+            padding: 10px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+        
+        .checklist li:before {
+            content: "□";
+            position: absolute;
+            left: 0;
+            font-size: 18px;
+            color: #667eea;
+        }
+        
+        footer {
+            background: #f9fafb;
+            padding: 20px 40px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            float: right;
+            margin-top: -8px;
+        }
+        
+        .copy-btn:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 클러스터 등록 가이드</h1>
+            <p>Multi-Cloud K8s Dashboard에 클러스터를 연결하세요</p>
+        </header>
+        
+        <div class="content">
+            <div class="tabs">
+                <button class="tab active" data-tab="cloud">클라우드 클러스터</button>
+                <button class="tab" data-tab="local">로컬 클러스터</button>
+            </div>
+            
+            <!-- 클라우드 클러스터 탭 -->
+            <div class="tab-content active" id="cloud">
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">1</div>
+                        <h3>ServiceAccount 생성</h3>
+                    </div>
+                    <div class="step-content">
+                        <pre><code>kubectl create serviceaccount k8s-monitor -n kube-system</code></pre>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">2</div>
+                        <h3>권한 설정 (ClusterRole & Binding)</h3>
+                    </div>
+                    <div class="step-content">
+                        <pre><code># ClusterRole 생성
+cat &lt;&lt;EOF | kubectl apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8s-monitor-role
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods", "namespaces", "services"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets"]
+  verbs: ["get", "list"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create"]
+EOF
+
+# ClusterRoleBinding 생성
+kubectl create clusterrolebinding k8s-monitor-binding \
+  --clusterrole=k8s-monitor-role \
+  --serviceaccount=kube-system:k8s-monitor</code></pre>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">3</div>
+                        <h3>토큰 발급</h3>
+                    </div>
+                    <div class="step-content">
+                        <p><strong>Kubernetes 1.24+:</strong></p>
+                        <pre><code>kubectl create token k8s-monitor -n kube-system --duration=87600h</code></pre>
+                        
+                        <p style="margin-top: 15px;"><strong>Kubernetes 1.23 이하:</strong></p>
+                        <pre><code>kubectl get secret $(kubectl get sa k8s-monitor -n kube-system -o jsonpath='{.secrets[0].name}') \
+  -n kube-system -o jsonpath='{.data.token}' | base64 --decode</code></pre>
+                        
+                        <div class="warning-box">
+                            ⚠️ <strong>중요:</strong> 발급된 토큰을 안전하게 보관하세요. 다시 조회할 수 없습니다.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">4</div>
+                        <h3>클러스터 정보 확인</h3>
+                    </div>
+                    <div class="step-content">
+                        <pre><code># API Server 주소 확인
+kubectl cluster-info | grep "Kubernetes control plane"
+
+# Kubernetes 버전 확인 (선택사항)
+kubectl version --short</code></pre>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">5</div>
+                        <h3>대시보드에 등록</h3>
+                    </div>
+                    <div class="step-content">
+                        <p>대시보드에서 다음 정보를 입력하세요:</p>
+                        <ul style="margin-left: 20px; margin-top: 10px;">
+                            <li><strong>Cluster Name:</strong> 식별 가능한 이름 (예: production-cluster)</li>
+                            <li><strong>Cloud Provider:</strong> AWS, GCP, Azure, Naver Cloud 등</li>
+                            <li><strong>API Endpoint:</strong> 위에서 확인한 주소 (예: https://xxx.xxx.xxx.xxx:6443)</li>
+                            <li><strong>Service Account Token:</strong> 발급받은 토큰 전체 붙여넣기</li>
+                            <li><strong>Region:</strong> 클러스터 리전 (예: ap-northeast-2)</li>
+                        </ul>
+                        
+                        <div class="success-box" style="margin-top: 15px;">
+                            ✅ 등록 후 메트릭이 정상적으로 표시되면 완료!
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 로컬 클러스터 탭 -->
+            <div class="tab-content" id="local">
+                <div class="info-box">
+                    <strong>📍 로컬 클러스터란?</strong><br>
+                    <code>kubectl cluster-info</code>에서 <strong>localhost (127.0.0.1)</strong> 또는 <strong>프라이빗 IP (192.168.x.x)</strong>가 표시되는 경우입니다.
+                </div>
+                
+                <p style="margin: 20px 0 15px 0; font-weight: 600; color: #1f2937;">먼저 위의 "클라우드 클러스터" 탭의 1~4단계를 완료하세요.</p>
+                
+                <div class="warning-box" style="margin-top: 30px;">
+                    <strong>⚠️ 외부 접근 설정 필요</strong><br>
+                    로컬 클러스터를 외부에서 접근하려면 <strong>포트포워딩</strong> 등 개인 네트워크 설정을 점검하세요.
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>공유기에서 <code>6443</code> 포트를 클러스터로 포워딩</li>
+                        <li>공인 IP 또는 DDNS 주소 확인</li>
+                        <li>방화벽 규칙 설정</li>
+                    </ul>
+                </div>
+                
+                <div class="info-box" style="margin-top: 20px;">
+                    <strong>💡 더 안전한 방법</strong><br>
+                    포트포워딩 대신 <strong>Tailscale</strong>, <strong>Cloudflare Tunnel</strong>, <strong>WireGuard VPN</strong> 같은 솔루션을 사용하는 것을 권장합니다.
+                </div>
+            </div>
+            
+            <!-- 체크리스트 -->
+            <div style="margin-top: 50px; padding: 25px; background: #f9fafb; border-radius: 8px;">
+                <h3 style="margin-bottom: 15px; color: #1f2937;">✅ 완료 체크리스트</h3>
+                <ul class="checklist">
+                    <li>ServiceAccount 생성 완료</li>
+                    <li>ClusterRole & Binding 생성 완료</li>
+                    <li>토큰 발급 및 안전하게 보관</li>
+                    <li>API Endpoint 확인 (로컬인 경우 외부 접근 설정)</li>
+                    <li>대시보드에 클러스터 등록</li>
+                    <li>메트릭이 정상적으로 표시됨</li>
+                </ul>
+            </div>
+        </div>
+        
+        <footer>
+            <p>문제가 있나요? GitHub Issues에서 도움을 받으세요.</p>
+        </footer>
+    </div>
+    
+    <script>
+        // 탭 전환
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.dataset.tab;
+                
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(targetTab).classList.add('active');
+            });
+        });
+        
+        // 메소드 카드 토글
+        function toggleMethod(card) {
+            card.classList.toggle('expanded');
+        }
+        
+        // 코드 복사 기능 (선택사항)
+        document.querySelectorAll('pre').forEach(pre => {
+            const button = document.createElement('button');
+            button.className = 'copy-btn';
+            button.textContent = '복사';
+            button.onclick = () => {
+                const code = pre.querySelector('code').textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    button.textContent = '✓ 복사됨';
+                    setTimeout(() => button.textContent = '복사', 2000);
+                });
+            };
+            pre.appendChild(button);
+        });
+    </script>
+</body>
+</html>

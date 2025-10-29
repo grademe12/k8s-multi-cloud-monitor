@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { BookOpen } from "lucide-react"
 
 interface AddClusterDialogProps {
   open: boolean
@@ -66,12 +67,20 @@ export function AddClusterDialog({ open, onOpenChange, onAddCluster }: AddCluste
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Register New Cluster</DialogTitle>
-          <DialogDescription>
-            Add a new Kubernetes cluster to monitor its performance and health.
-          </DialogDescription>
-        </DialogHeader>
+<DialogHeader>
+  <div className="flex items-center justify-between">
+    <DialogTitle>Add New Cluster</DialogTitle>
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={() => window.open('/guide/cluster-setup.html', '_blank')}
+    >
+      <BookOpen className="w-4 h-4 mr-2" />
+      설정 가이드
+    </Button>
+  </div>
+</DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             {/* Cluster Name */}
