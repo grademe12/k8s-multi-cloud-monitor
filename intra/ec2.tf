@@ -18,7 +18,7 @@ resource "aws_instance" "k3s_master" {
   key_name               = aws_key_pair.main.key_name
   private_ip             = "10.1.2.10"
 
-  user_data = file("${path.module}/scripts/k3s-master-init.sh")
+  user_data = file("/home/woosupar/k-paas/intra/scripts/k3s-master-init.sh")
 
   root_block_device {
     volume_size = 30
@@ -39,7 +39,7 @@ resource "aws_instance" "k3s_worker" {
   vpc_security_group_ids = [aws_security_group.k8s.id]
   key_name               = aws_key_pair.main.key_name
 
-  user_data = templatefile("${path.module}/scripts/k3s-worker-init.sh", {
+  user_data = templatefile("/home/woosupar/k-paas/intra/scripts/k3s-worker-init.sh", {
     master_ip = aws_instance.k3s_master.private_ip
   })
 
@@ -56,6 +56,7 @@ resource "aws_instance" "k3s_worker" {
   depends_on = [aws_instance.k3s_master]
 }
 
+# terraform/aws/main.tf
 resource "aws_instance" "postgresql" {
   ami                    = "ami-040c33c6a51fd5d96"
   instance_type          = "t3.micro"
@@ -64,7 +65,12 @@ resource "aws_instance" "postgresql" {
   key_name               = aws_key_pair.main.key_name
   private_ip             = "10.1.2.100"
 
-  user_data = file("${path.module}/scripts/postgres-init.sh")
+  # templatefile로 변수 전달
+  user_data = templatefile("/home/woosupar/k-paas/intra/scripts/postgres-init.sh", {
+    db_name     = var.db_name
+    db_user     = var.db_user
+    db_password = var.db_password
+  })
 
   root_block_device {
     volume_size = 20
