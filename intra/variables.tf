@@ -18,3 +18,7 @@ variable "db_user" {
   type = string
   sensitive = true
 }
+
+variable "k8s_version" {
+  default = "1.29"
+}
