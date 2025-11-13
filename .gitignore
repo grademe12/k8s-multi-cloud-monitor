@@ -108,3 +108,7 @@ next-env.d.ts
 
 # testing db
 metrics.db
+
+#ansible
+ansible/inventory/terraform.json
+ansible/*.retry

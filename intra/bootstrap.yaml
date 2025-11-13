@@ -1,0 +1,10 @@
+#cloud-config
+users:
+  - name: ansible
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ${file("${path.module}/../keys/ansible_rsa.pub")}
+package_update: true
+packages:
+  - python3
+  - python3-pip
