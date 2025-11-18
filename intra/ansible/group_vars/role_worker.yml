@@ -1,0 +1,5 @@
+# intra/ansible/group_vars/role_worker.yml
+---
+# K3s Worker Configuration
+k3s_version: v1.28.5+k3s1
+k3s_server_url: https://10.1.2.10:6443

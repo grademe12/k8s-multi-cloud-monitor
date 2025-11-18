@@ -1,0 +1,34 @@
+# intra/ansible/roles/k3s-worker/tasks/main.yml
+---
+- name: Get K3s token from SSM Parameter Store
+  shell: |
+    aws ssm get-parameter \
+      --name /k3s/node-token \
+      --with-decryption \
+      --region {{ aws_region }} \
+      --query 'Parameter.Value' \
+      --output text
+  register: k3s_token
+  delegate_to: localhost
+  become: no
+
+- name: Download K3s install script
+  get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s-install.sh
+    mode: '0755'
+
+- name: Install K3s agent
+  shell: |
+    INSTALL_K3S_VERSION={{ k3s_version }} \
+    K3S_URL={{ k3s_server_url }} \
+    K3S_TOKEN={{ k3s_token.stdout }} \
+    sh /tmp/k3s-install.sh agent
+  args:
+    creates: /usr/local/bin/k3s
+
+- name: Wait for k3s-agent service
+  systemd:
+    name: k3s-agent
+    state: started
+    enabled: yes

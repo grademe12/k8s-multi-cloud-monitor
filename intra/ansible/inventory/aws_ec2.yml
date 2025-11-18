@@ -1,1 +1,26 @@
-plugin: amazon.aws.aws_ec2
+# inventory/aws_ec2.yml
+
+plugin: amazon.aws.aws_ec2                 # AWS EC2 플러그인 사용
+
+regions:
+  - ap-northeast-2                         # 서울 리전
+
+filters:
+  tag:Name:                                # Name 태그로 필터링
+    - bastion
+    - k3s-master
+    - k3s-worker-*                         # 와일드카드
+    - postgresql
+  instance-state-name: running             # 실행 중인 인스턴스만
+
+keyed_groups:
+  - key: tags.Role                         # Role 태그로 그룹 생성
+    prefix: role                           # 결과: role_master, role_worker
+  - key: tags.Name                         # Name 태그로 그룹 생성
+    separator: ''                          # 결과: bastion, k3s_master
+
+hostnames:
+  - private-ip-address                     # Private IP를 호스트명으로 사용
+
+compose:
+  ansible_host: private_ip_address         # ansible_host 변수에 Private IP 할당

@@ -112,3 +112,8 @@ metrics.db
 #ansible
 ansible/inventory/terraform.json
 ansible/*.retry
+
+#python
+**/venv/
+intra/ansible/venv/
+venv/

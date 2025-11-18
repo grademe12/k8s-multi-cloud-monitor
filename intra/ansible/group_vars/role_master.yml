@@ -1,0 +1,15 @@
+# intra/ansible/group_vars/role_master.yml
+---
+# K3s Master Configuration
+k3s_version: v1.28.5+k3s1
+k3s_server_ip: 10.1.2.10
+
+# K3s Installation Options
+k3s_install_options:
+  - --write-kubeconfig-mode=644
+  - --disable=traefik
+  - --disable=servicelb
+  - --tls-san={{ k3s_server_ip }}
+
+# ArgoCD
+argocd_version: v2.9.3

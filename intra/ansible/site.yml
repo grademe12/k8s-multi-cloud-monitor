@@ -1,0 +1,25 @@
+# intra/ansible/site.yml
+---
+- name: Configure all hosts
+  hosts: all
+  become: yes
+  roles:
+    - common
+
+- name: Configure K3s master
+  hosts: role_master
+  become: yes
+  roles:
+    - k3s-master
+
+- name: Configure K3s workers
+  hosts: role_worker
+  become: yes
+  roles:
+    - k3s-worker
+
+- name: Configure PostgreSQL
+  hosts: postgresql
+  become: yes
+  roles:
+    - postgresql

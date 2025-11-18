@@ -1,0 +1,33 @@
+# intra/ansible/roles/k3s-master/tasks/main.yml
+---
+- name: Download K3s install script
+  get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s-install.sh
+    mode: '0755'
+
+- name: Install K3s server
+  shell: |
+    INSTALL_K3S_VERSION={{ k3s_version }} \
+    sh /tmp/k3s-install.sh server {{ k3s_install_options | join(' ') }}
+  args:
+    creates: /usr/local/bin/k3s
+
+- name: Wait for K3s to be ready
+  wait_for:
+    path: /etc/rancher/k3s/k3s.yaml
+    timeout: 300
+
+- name: Get node token
+  slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: node_token
+
+- name: Save token to SSM Parameter Store
+  shell: |
+    aws ssm put-parameter \
+      --name /k3s/node-token \
+      --value "{{ node_token.content | b64decode | trim }}" \
+      --type SecureString \
+      --overwrite \
+      --region {{ aws_region }}
