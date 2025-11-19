@@ -3,7 +3,7 @@ users:
   - name: ansible
     sudo: ALL=(ALL) NOPASSWD:ALL
     ssh_authorized_keys:
-      - ${file("${path.module}/../keys/ansible_rsa.pub")}
+      - ${ansible_pub_key}
 package_update: true
 packages:
   - python3
