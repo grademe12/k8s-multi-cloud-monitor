@@ -112,6 +112,7 @@ metrics.db
 #ansible
 ansible/inventory/terraform.json
 ansible/*.retry
+keys/
 
 #python
 **/venv/

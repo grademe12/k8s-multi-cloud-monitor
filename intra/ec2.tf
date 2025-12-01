@@ -19,9 +19,9 @@ resource "aws_instance" "k3s_master" {
   private_ip             = "10.1.2.10"
   iam_instance_profile = aws_iam_instance_profile.k8s_node.name
 
-  user_data = base64encode(templatefile("${path.module}/bootstrap.yml", {
-  ansible_pub_key = file("${path.module}/keys/ansible_rsa.pub")
-  }))
+  user_data = templatefile("${path.module}/bootstrap.yml", {
+  ansible_pub_key = trimspace(file("${path.module}/keys/ansible_rsa.pub"))
+  })
   user_data_replace_on_change = true
 
   root_block_device {
@@ -44,8 +44,8 @@ resource "aws_instance" "k3s_worker" {
   key_name               = aws_key_pair.main.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s_node.name
 
-  user_data = base64encode(templatefile("${path.module}/bootstrap.yml", {
-  ansible_pub_key = file("${path.module}/keys/ansible_rsa.pub")
+  user_data_base64 = base64encode(templatefile("${path.module}/bootstrap.yml", {
+  ansible_pub_key = trimspace(file("${path.module}/keys/ansible_rsa.pub"))
   }))
   user_data_replace_on_change = true
 
@@ -71,8 +71,8 @@ resource "aws_instance" "postgresql" {
   key_name               = aws_key_pair.main.key_name
   private_ip             = "10.1.2.100"
 
-  user_data = base64encode(templatefile("${path.module}/bootstrap.yml", {
-  ansible_pub_key = file("${path.module}/keys/ansible_rsa.pub")
+  user_data_base64 = base64encode(templatefile("${path.module}/bootstrap.yml", {
+  ansible_pub_key = trimspace(file("${path.module}/keys/ansible_rsa.pub"))
   }))
   user_data_replace_on_change = true
 

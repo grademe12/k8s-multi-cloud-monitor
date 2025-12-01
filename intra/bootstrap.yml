@@ -1,5 +1,6 @@
 #cloud-config
 users:
+  - default
   - name: ansible
     sudo: ALL=(ALL) NOPASSWD:ALL
     ssh_authorized_keys:
