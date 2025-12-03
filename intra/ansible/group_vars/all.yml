@@ -18,3 +18,4 @@ common_packages:
   - vim
   - htop
   - net-tools
+  - unzip
