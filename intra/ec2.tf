@@ -5,6 +5,11 @@ resource "aws_instance" "bastion" {
   vpc_security_group_ids = [aws_security_group.bastion.id]
   key_name               = aws_key_pair.main.key_name
 
+  user_data = templatefile("${path.module}/bootstrap.yml", {
+  ansible_pub_key = trimspace(file("${path.module}/keys/ansible_rsa.pub"))
+  })
+  user_data_replace_on_change = true
+
   tags = {
     Name = "bastion"
   }
