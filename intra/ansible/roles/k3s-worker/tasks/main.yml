@@ -9,8 +9,6 @@
       --query 'Parameter.Value' \
       --output text
   register: k3s_token
-  delegate_to: localhost
-  become: no
 
 - name: Download K3s install script
   get_url:

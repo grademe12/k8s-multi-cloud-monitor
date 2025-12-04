@@ -28,7 +28,7 @@ resource "aws_iam_role_policy" "ssm_access" {
           "ssm:PutParameter",
           "ssm:GetParameter"
         ]
-        Resource = "arn:aws:ssm:ap-northeast-2:*:parameter/k8s/*"
+        Resource = "arn:aws:ssm:ap-northeast-2:*:parameter/k3s/*"
       }
     ]
   })

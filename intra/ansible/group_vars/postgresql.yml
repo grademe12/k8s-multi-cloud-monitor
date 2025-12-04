@@ -1,7 +1,7 @@
 # intra/ansible/group_vars/postgresql.yml
 ---
 # PostgreSQL Configuration
-postgres_version: 15
+postgres_version: 16
 postgres_port: 5432
 postgres_listen_addresses: '*'
 
@@ -9,3 +9,4 @@ postgres_listen_addresses: '*'
 db_name: mcm
 db_user: woosupar
 # db_password는 ansible-vault로 암호화 예정
+db_password: "this_is_my_super_secret"
