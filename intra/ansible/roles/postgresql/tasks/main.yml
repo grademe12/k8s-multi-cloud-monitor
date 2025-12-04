@@ -37,7 +37,14 @@
   postgresql_user:
     name: "{{ db_user }}"
     password: "{{ db_password }}"
-    db: "{{ db_name }}"
-    priv: "ALL"
     state: present
+  become_user: postgres
+
+- name: Grant all priv on db
+  postgresql_privs:
+    type: database
+    db: postgres
+    obj: "{{ db_name }}"
+    role: "{{ db_user }}"
+    privs: ALL
   become_user: postgres
