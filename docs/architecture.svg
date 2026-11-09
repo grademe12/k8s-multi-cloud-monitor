@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 380" width="640" height="380" role="img" aria-label="k8s-multi-cloud-monitor 구성도: 사용자는 NCP Object Storage에 올린 Next.js 정적 페이지를 받고, API는 Ingress와 ALB를 거쳐 NKS의 NestJS 백엔드로 들어갑니다. 백엔드는 1분마다 등록된 각 클러스터의 Kubernetes API에서 노드와 파드 정보를 읽어 Cloud DB for PostgreSQL에 저장합니다. 여러 파드 중 advisory lock을 잡은 하나만 수집하고, 클러스터 토큰은 암호화해서 저장합니다.">
+<rect width="640" height="380" fill="#fff"></rect>
+<defs><pattern id="k8smon-grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#f0f0f0" stroke-width="1"></path></pattern></defs>
+<rect width="640" height="380" fill="url(#k8smon-grid)"></rect>
+<rect x="170" y="20" width="300" height="340" fill="none" stroke="#8d8d8d" stroke-width="1"></rect>
+<path d="M120 68 H200" fill="none" stroke="#d1621f" stroke-width="4"></path>
+<path d="M70 92 V142 H200" fill="none" stroke="#d1621f" stroke-width="4"></path>
+<path d="M320 164 V185 M320 249 V270" fill="none" stroke="#161616" stroke-width="1.5"></path>
+<path d="M440 217 H480 M480 88 V282 M480 88 H500 M480 282 H500" fill="none" stroke="#0f62fe" stroke-width="3" stroke-dasharray="8 5"></path>
+<g font-family="-apple-system, BlinkMacSystemFont, Apple SD Gothic Neo, Pretendard Variable, Pretendard, sans-serif" font-size="13" fill="#161616">
+<text x="182" y="348" text-anchor="start" font-size="12" fill="#8d8d8d">NCP · VPC</text>
+<rect x="20" y="44" width="100" height="48" fill="#fff" stroke="#161616" stroke-width="1.5"></rect>
+<text x="70" y="73" text-anchor="middle" font-weight="600" font-size="13">사용자</text>
+<rect x="200" y="40" width="240" height="56" fill="#fff" stroke="#161616" stroke-width="1.5"></rect>
+<text x="320" y="63.5" text-anchor="middle" font-weight="600" font-size="13">Object Storage</text>
+<text x="320" y="82.5" text-anchor="middle" font-size="11" fill="#525252" font-family="IBM Plex Mono, monospace">Next.js 정적 export</text>
+<rect x="200" y="120" width="240" height="44" fill="#fff" stroke="#161616" stroke-width="1.5"></rect>
+<text x="320" y="137.5" text-anchor="middle" font-weight="600" font-size="13">Ingress · ALB</text>
+<text x="320" y="156.5" text-anchor="middle" font-size="11" fill="#525252" font-family="IBM Plex Mono, monospace">HTTPS 443</text>
+<rect x="200" y="185" width="240" height="64" fill="#161616"></rect>
+<text x="320" y="203" text-anchor="middle" font-weight="600" font-size="13" fill="#fff">NKS</text>
+<text x="320" y="222" text-anchor="middle" font-size="11" fill="#c6c6c6" font-family="IBM Plex Mono, monospace">NestJS 백엔드 ×N</text>
+<text x="320" y="241" text-anchor="middle" font-size="12" fill="#c6c6c6">1분 수집 · advisory lock</text>
+<rect x="200" y="270" width="240" height="52" fill="#fff" stroke="#161616" stroke-width="1.5"></rect>
+<text x="320" y="291.5" text-anchor="middle" font-weight="600" font-size="12">Cloud DB for PostgreSQL</text>
+<text x="320" y="310.5" text-anchor="middle" font-size="12" fill="#525252">지표 · 클러스터 토큰(암호화)</text>
+<rect x="500" y="56" width="120" height="64" fill="#fff" stroke="#161616" stroke-width="1.5"></rect>
+<text x="560" y="83.5" text-anchor="middle" font-weight="600" font-size="13">클러스터 A</text>
+<text x="560" y="102.5" text-anchor="middle" font-size="11" fill="#525252" font-family="IBM Plex Mono, monospace">K8s API</text>
+<rect x="500" y="250" width="120" height="64" fill="#fff" stroke="#161616" stroke-width="1.5"></rect>
+<text x="560" y="277.5" text-anchor="middle" font-weight="600" font-size="13">클러스터 B</text>
+<text x="560" y="296.5" text-anchor="middle" font-size="11" fill="#525252" font-family="IBM Plex Mono, monospace">K8s API</text>
+<text x="560" y="180" text-anchor="middle" font-size="11" fill="#525252">등록된 클러스터</text>
+<text x="560" y="198" text-anchor="middle" font-size="11" fill="#0f62fe">1분마다 노드 · 파드</text>
+</g>
+</svg>

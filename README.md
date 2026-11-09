@@ -6,14 +6,7 @@
 
 ## 구조
 
-```text
-사용자
-  ├─▶ 프론트엔드 (Next.js 정적 export) ── NCP Object Storage 정적 호스팅
-  └─▶ API (Ingress, ALB, HTTPS)
-        ▼
-     NKS 클러스터 ── 백엔드 (NestJS) ──▶ Cloud DB for PostgreSQL
-                         └─▶ 등록된 각 클러스터의 Kubernetes API
-```
+![멀티 클러스터 모니터 구성도](docs/architecture.svg)
 
 - **수집:** 백엔드가 1분마다 등록된 모든 클러스터에서 노드와 파드 정보를 읽어 DB에 쌓습니다. 한 클러스터가 실패해도 나머지는 계속 수집합니다.
 - **중복 수집 방지:** 백엔드 파드가 여러 개 떠도 수집은 한 번만 돕니다. 수집을 시작할 때 PostgreSQL advisory lock을 잡고, 못 잡은 파드는 그 회차를 건너뜁니다.
